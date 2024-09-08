@@ -3,7 +3,7 @@ use std::io;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
-    layout::{Alignment, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     symbols::border,
     text::Line,
@@ -126,14 +126,32 @@ impl App {
                     .position(Position::Bottom),
             )
             .border_set(border::THICK);
+        block.render(area, buf);
+
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
+
+        let main_block = Block::bordered()
+            .title(Title::from("Select mode"))
+            .title_bottom(Line::from(vec![
+                " Select item ".into(),
+                "<↑↓> + <Enter>".blue().bold(),
+            ]));
 
         StatefulWidget::render(
             List::new(["Host", "Join"])
-                .block(block)
+                .block(main_block)
                 .highlight_style(SELECTED_STYLE),
-            area,
+            main_area,
             buf,
             list_state,
         );
     }
+}
+
+fn center(area: Rect, horizontal: Constraint, vertical: Constraint) -> Rect {
+    let [area] = Layout::horizontal([horizontal])
+        .flex(Flex::Center)
+        .areas(area);
+    let [area] = Layout::vertical([vertical]).flex(Flex::Center).areas(area);
+    area
 }
