@@ -1,4 +1,7 @@
-use std::{io, net::SocketAddr};
+use std::{
+    io,
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -91,6 +94,7 @@ impl App {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Down | KeyCode::Char('j') => self.state.next_list_item(),
             KeyCode::Up | KeyCode::Char('k') => self.state.prev_list_item(),
+            KeyCode::Enter => self.state.select_item(),
             _ => {}
         }
     }
@@ -120,6 +124,20 @@ impl AppState {
             list_state.select_previous()
         }
     }
+
+    fn select_item(&mut self) {
+        let AppState::ModeSelect(list_state) = self else {
+            return;
+        };
+        match list_state.selected() {
+            Some(0) => {
+                *self = AppState::Host(HostConfig {
+                    address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
+                })
+            }
+            _ => {}
+        }
+    }
 }
 
 impl Widget for &mut App {
@@ -132,25 +150,6 @@ impl Widget for &mut App {
 }
 
 impl App {
-    fn render_host(area: Rect, buf: &mut Buffer, host_config: &mut HostConfig) {
-        let title = Title::from(" Under Control(ler) ".bold());
-        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
-        let block = Block::bordered()
-            .title(title.alignment(Alignment::Center))
-            .title(
-                instructions
-                    .alignment(Alignment::Center)
-                    .position(Position::Bottom),
-            )
-            .border_set(border::THICK);
-        block.render(area, buf);
-
-        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
-
-        let main_block = Block::bordered().title(Title::from("Host"));
-        main_block.render(main_area, buf)
-    }
-
     fn render_mode_select(area: Rect, buf: &mut Buffer, list_state: &mut ListState) {
         let title = Title::from(" Under Control(ler) ".bold());
         let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
@@ -181,6 +180,26 @@ impl App {
             buf,
             list_state,
         );
+    }
+
+    fn render_host(area: Rect, buf: &mut Buffer, host_config: &mut HostConfig) {
+        let title = Title::from(" Under Control(ler) ".bold());
+        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
+        let block = Block::bordered()
+            .title(title.alignment(Alignment::Center))
+            .title(
+                instructions
+                    .alignment(Alignment::Center)
+                    .position(Position::Bottom),
+            )
+            .border_set(border::THICK);
+        block.render(area, buf);
+
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
+
+        let main_block =
+            Block::bordered().title(Title::from(format!("Hosting at {}", host_config.address)));
+        main_block.render(main_area, buf)
     }
 }
 
