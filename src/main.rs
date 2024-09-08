@@ -102,6 +102,7 @@ impl App {
             KeyCode::Down | KeyCode::Char('j') => self.state.next_list_item(),
             KeyCode::Up | KeyCode::Char('k') => self.state.prev_list_item(),
             KeyCode::Enter => self.state.select_item(),
+            KeyCode::Esc => self.prev_state(),
             _ => {}
         }
     }
@@ -109,6 +110,7 @@ impl App {
     fn handel_key_event_host(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Esc => self.prev_state(),
             _ => {}
         }
     }
@@ -116,6 +118,7 @@ impl App {
     fn handel_key_event_join(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Esc => self.prev_state(),
             _ => {}
         }
     }
@@ -123,6 +126,15 @@ impl App {
     fn exit(&mut self) {
         dbg!(&self);
         self.exit = true;
+    }
+
+    fn prev_state(&mut self) {
+        let target_state = match self.state {
+            AppState::Host(_) | AppState::Join(_) => AppState::ModeSelect(ListState::default()),
+            _ => return,
+        };
+
+        self.state = target_state;
     }
 }
 
@@ -186,10 +198,10 @@ impl App {
         let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
 
         let main_block = Block::bordered()
-            .title(Title::from("Select mode"))
+            .title(Title::from(" Select mode "))
             .title_bottom(Line::from(vec![
                 " Select item ".into(),
-                "<↑↓> + <Enter>".blue().bold(),
+                "<↑↓> + <Enter> ".blue().bold(),
             ]));
 
         StatefulWidget::render(
@@ -204,7 +216,12 @@ impl App {
 
     fn render_host(area: Rect, buf: &mut Buffer, host_config: &mut HostConfig) {
         let title = Title::from(" Under Control(ler) ".bold());
-        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
+        let instructions = Title::from(Line::from(vec![
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+            " Return ".into(),
+            "<Esc> ".blue().bold(),
+        ]));
         let block = Block::bordered()
             .title(title.alignment(Alignment::Center))
             .title(
@@ -224,7 +241,12 @@ impl App {
 
     fn render_join(area: Rect, buf: &mut Buffer, join_config: &mut JoinConfig) {
         let title = Title::from(" Under Control(ler) ".bold());
-        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
+        let instructions = Title::from(Line::from(vec![
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+            " Return ".into(),
+            "<Esc> ".blue().bold(),
+        ]));
         let block = Block::bordered()
             .title(title.alignment(Alignment::Center))
             .title(
