@@ -149,6 +149,11 @@ impl AppState {
                     address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
                 })
             }
+            Some(1) => {
+                *self = AppState::Join(JoinConfig {
+                    address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
+                })
+            }
             _ => {}
         }
     }
