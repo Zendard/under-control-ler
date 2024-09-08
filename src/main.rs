@@ -48,10 +48,16 @@ impl Default for App {
 pub enum AppState {
     ModeSelect(ListState),
     Host(HostConfig),
+    Join(JoinConfig),
 }
 
 #[derive(Debug)]
 pub struct HostConfig {
+    address: SocketAddr,
+}
+
+#[derive(Debug)]
+pub struct JoinConfig {
     address: SocketAddr,
 }
 
@@ -85,6 +91,7 @@ impl App {
         match self.state {
             AppState::ModeSelect(_) => self.handle_key_event_mode_select(event),
             AppState::Host(_) => self.handel_key_event_host(event),
+            AppState::Join(_) => self.handel_key_event_join(event),
         }
         Ok(())
     }
@@ -100,6 +107,13 @@ impl App {
     }
 
     fn handel_key_event_host(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            _ => {}
+        }
+    }
+
+    fn handel_key_event_join(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             _ => {}
@@ -145,6 +159,7 @@ impl Widget for &mut App {
         match &mut self.state {
             AppState::ModeSelect(list_state) => App::render_mode_select(area, buf, list_state),
             AppState::Host(host_config) => App::render_host(area, buf, host_config),
+            AppState::Join(join_config) => App::render_join(area, buf, join_config),
         }
     }
 }
@@ -199,6 +214,26 @@ impl App {
 
         let main_block =
             Block::bordered().title(Title::from(format!("Hosting at {}", host_config.address)));
+        main_block.render(main_area, buf)
+    }
+
+    fn render_join(area: Rect, buf: &mut Buffer, join_config: &mut JoinConfig) {
+        let title = Title::from(" Under Control(ler) ".bold());
+        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
+        let block = Block::bordered()
+            .title(title.alignment(Alignment::Center))
+            .title(
+                instructions
+                    .alignment(Alignment::Center)
+                    .position(Position::Bottom),
+            )
+            .border_set(border::THICK);
+        block.render(area, buf);
+
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
+
+        let main_block =
+            Block::bordered().title(Title::from(format!("Joining {}", join_config.address)));
         main_block.render(main_area, buf)
     }
 }
