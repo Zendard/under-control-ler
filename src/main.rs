@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, net::SocketAddr};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -44,6 +44,12 @@ impl Default for App {
 #[derive(Debug)]
 pub enum AppState {
     ModeSelect(ListState),
+    Host(HostConfig),
+}
+
+#[derive(Debug)]
+pub struct HostConfig {
+    address: SocketAddr,
 }
 
 impl App {
@@ -75,6 +81,7 @@ impl App {
 
         match self.state {
             AppState::ModeSelect(_) => self.handle_key_event_mode_select(event),
+            AppState::Host(_) => self.handel_key_event_host(event),
         }
         Ok(())
     }
@@ -88,6 +95,13 @@ impl App {
         }
     }
 
+    fn handel_key_event_host(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Char('q') => self.exit(),
+            _ => {}
+        }
+    }
+
     fn exit(&mut self) {
         dbg!(&self);
         self.exit = true;
@@ -96,13 +110,15 @@ impl App {
 
 impl AppState {
     fn next_list_item(&mut self) {
-        let AppState::ModeSelect(list_state) = self;
-        list_state.select_next()
+        if let AppState::ModeSelect(list_state) = self {
+            list_state.select_next()
+        }
     }
 
     fn prev_list_item(&mut self) {
-        let AppState::ModeSelect(list_state) = self;
-        list_state.select_previous()
+        if let AppState::ModeSelect(list_state) = self {
+            list_state.select_previous()
+        }
     }
 }
 
@@ -110,11 +126,31 @@ impl Widget for &mut App {
     fn render(self, area: Rect, buf: &mut Buffer) {
         match &mut self.state {
             AppState::ModeSelect(list_state) => App::render_mode_select(area, buf, list_state),
+            AppState::Host(host_config) => App::render_host(area, buf, host_config),
         }
     }
 }
 
 impl App {
+    fn render_host(area: Rect, buf: &mut Buffer, host_config: &mut HostConfig) {
+        let title = Title::from(" Under Control(ler) ".bold());
+        let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
+        let block = Block::bordered()
+            .title(title.alignment(Alignment::Center))
+            .title(
+                instructions
+                    .alignment(Alignment::Center)
+                    .position(Position::Bottom),
+            )
+            .border_set(border::THICK);
+        block.render(area, buf);
+
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
+
+        let main_block = Block::bordered().title(Title::from("Host"));
+        main_block.render(main_area, buf)
+    }
+
     fn render_mode_select(area: Rect, buf: &mut Buffer, list_state: &mut ListState) {
         let title = Title::from(" Under Control(ler) ".bold());
         let instructions = Title::from(Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]));
