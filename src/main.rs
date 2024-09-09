@@ -157,7 +157,16 @@ impl App {
         self.state = target_state;
     }
 
-    fn join(&mut self) {}
+    fn join(&mut self) {
+        let AppState::Join(ref join_config) = self.state else {
+            return;
+        };
+
+        under_control_ler::join(under_control_ler::JoinConfig {
+            address: join_config.address.clone(),
+            port: join_config.port.clone(),
+        });
+    }
 }
 
 impl JoinConfig {
