@@ -1,8 +1,3 @@
-use std::{
-    io,
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-};
-
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -16,6 +11,7 @@ use ratatui::{
     },
     DefaultTerminal,
 };
+use std::io;
 
 const SELECTED_STYLE: Style = Style::new()
     .bg(Color::White)
@@ -51,9 +47,10 @@ pub enum AppState {
     Join(JoinConfig),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct HostConfig {
-    address: SocketAddr,
+    port: String,
+    character_index: usize,
 }
 
 #[derive(Debug, Default)]
@@ -118,9 +115,17 @@ impl App {
     }
 
     fn handel_key_event_host(&mut self, key_event: KeyEvent) {
+        let AppState::Host(ref mut host_config) = self.state else {
+            return;
+        };
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => self.prev_state(),
+            KeyCode::Enter => self.join(),
+            KeyCode::Char(to_insert) => host_config.enter_char(to_insert),
+            KeyCode::Backspace => host_config.delete_char(),
+            KeyCode::Left => host_config.move_cursor_left(),
+            KeyCode::Right => host_config.move_cursor_right(),
             _ => {}
         }
     }
@@ -252,6 +257,60 @@ impl JoinConfig {
     }
 }
 
+impl HostConfig {
+    fn enter_char(&mut self, to_insert: char) {
+        let index = self.byte_index();
+        let input_field = &mut self.port;
+
+        input_field.insert(index, to_insert);
+        self.move_cursor_right();
+    }
+
+    fn byte_index(&mut self) -> usize {
+        let input_field = &mut self.port;
+
+        input_field
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.character_index)
+            .unwrap_or(input_field.len())
+    }
+
+    fn delete_char(&mut self) {
+        if self.character_index == 0 {
+            return;
+        }
+
+        let input_field = &mut self.port;
+
+        let from_left_to_current_index = self.character_index - 1;
+
+        // Getting all characters before the selected character.
+        let before_char_to_delete = input_field.chars().take(from_left_to_current_index);
+        // Getting all characters after selected character.
+        let after_char_to_delete = input_field.chars().skip(self.character_index);
+
+        // Put all characters together except the selected one.
+        // By leaving the selected one out, it is forgotten and therefore deleted.
+        *input_field = before_char_to_delete.chain(after_char_to_delete).collect();
+        self.move_cursor_left();
+    }
+
+    fn move_cursor_left(&mut self) {
+        let input_field = &mut self.port;
+
+        let cursor_moved_right = self.character_index.saturating_sub(1);
+        self.character_index = cursor_moved_right.clamp(0, input_field.chars().count())
+    }
+
+    fn move_cursor_right(&mut self) {
+        let input_field = &mut self.port;
+
+        let cursor_moved_right = self.character_index.saturating_add(1);
+        self.character_index = cursor_moved_right.clamp(0, input_field.chars().count())
+    }
+}
+
 impl AppState {
     fn next_list_item(&mut self) {
         if let AppState::ModeSelect(list_state) = self {
@@ -270,11 +329,7 @@ impl AppState {
             return;
         };
         match list_state.selected() {
-            Some(0) => {
-                *self = AppState::Host(HostConfig {
-                    address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
-                })
-            }
+            Some(0) => *self = AppState::Host(HostConfig::default()),
             Some(1) => *self = AppState::Join(JoinConfig::default()),
             _ => {}
         }
@@ -342,11 +397,19 @@ impl App {
             .border_set(border::THICK);
         block.render(area, buf);
 
-        let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(3));
 
-        let main_block =
-            Block::bordered().title(Title::from(format!("Hosting at {}", host_config.address)));
-        main_block.render(main_area, buf)
+        Block::bordered()
+            .title(Title::from("Enter port"))
+            .render(main_area, buf);
+
+        let byte_index = host_config.byte_index();
+        let mut port_text = host_config.port.clone();
+        port_text.insert(byte_index, '▌');
+
+        let port_input = Paragraph::new(port_text).block(Block::bordered().title("Port:"));
+
+        port_input.render(main_area, buf)
     }
 
     fn render_join(area: Rect, buf: &mut Buffer, join_config: &mut JoinConfig) {
@@ -377,14 +440,16 @@ impl App {
             Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .areas(main_area);
 
-        let (address_input, port_input) = match join_config.current_input {
-            JoinInput::Address => {
-                App::input_widgets(join_config.address.clone() + "▌", join_config.port.clone())
-            }
-            JoinInput::Port => {
-                App::input_widgets(join_config.address.clone(), join_config.port.clone() + "▌")
-            }
+        let byte_index = join_config.byte_index();
+
+        let mut address_text = join_config.address.clone();
+        let mut port_text = join_config.port.clone();
+        match join_config.current_input {
+            JoinInput::Address => address_text.insert(byte_index, '▌'),
+            JoinInput::Port => port_text.insert(byte_index, '▌'),
         };
+
+        let (address_input, port_input) = App::input_widgets(address_text, port_text);
 
         address_input.render(address_area, buf);
         port_input.render(port_area, buf)
