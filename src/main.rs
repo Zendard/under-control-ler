@@ -12,7 +12,7 @@ use ratatui::{
     text::Line,
     widgets::{
         block::{Position, Title},
-        Block, List, ListState, StatefulWidget, Widget,
+        Block, List, ListState, Paragraph, StatefulWidget, Widget,
     },
     DefaultTerminal,
 };
@@ -56,9 +56,19 @@ pub struct HostConfig {
     address: SocketAddr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct JoinConfig {
-    address: SocketAddr,
+    address: String,
+    port: String,
+    character_index: usize,
+    current_input: JoinInput,
+}
+
+#[derive(Debug, Default)]
+pub enum JoinInput {
+    #[default]
+    Address,
+    Port,
 }
 
 impl App {
@@ -116,9 +126,19 @@ impl App {
     }
 
     fn handel_key_event_join(&mut self, key_event: KeyEvent) {
+        let AppState::Join(ref mut join_config) = self.state else {
+            return;
+        };
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => self.prev_state(),
+            KeyCode::Enter => self.join(),
+            KeyCode::Down => join_config.next_input(),
+            KeyCode::Up => join_config.prev_input(),
+            KeyCode::Char(to_insert) => join_config.enter_char(to_insert),
+            KeyCode::Backspace => join_config.delete_char(),
+            KeyCode::Left => join_config.move_cursor_left(),
+            KeyCode::Right => join_config.move_cursor_right(),
             _ => {}
         }
     }
@@ -135,6 +155,91 @@ impl App {
         };
 
         self.state = target_state;
+    }
+
+    fn join(&mut self) {}
+}
+
+impl JoinConfig {
+    fn prev_input(&mut self) {
+        match self.current_input {
+            JoinInput::Address => {}
+            JoinInput::Port => self.current_input = JoinInput::Address,
+        }
+    }
+
+    fn next_input(&mut self) {
+        match self.current_input {
+            JoinInput::Address => self.current_input = JoinInput::Port,
+            JoinInput::Port => {}
+        }
+    }
+
+    fn enter_char(&mut self, to_insert: char) {
+        let index = self.byte_index();
+        let input_field = match self.current_input {
+            JoinInput::Address => &mut self.address,
+            JoinInput::Port => &mut self.port,
+        };
+
+        input_field.insert(index, to_insert);
+        self.move_cursor_right();
+    }
+
+    fn byte_index(&self) -> usize {
+        let input_field = match self.current_input {
+            JoinInput::Address => &self.address,
+            JoinInput::Port => &self.port,
+        };
+
+        input_field
+            .char_indices()
+            .map(|(i, _)| i)
+            .nth(self.character_index)
+            .unwrap_or(input_field.len())
+    }
+
+    fn delete_char(&mut self) {
+        if self.character_index == 0 {
+            return;
+        }
+
+        let input_field = match self.current_input {
+            JoinInput::Address => &mut self.address,
+            JoinInput::Port => &mut self.port,
+        };
+
+        let from_left_to_current_index = self.character_index - 1;
+
+        // Getting all characters before the selected character.
+        let before_char_to_delete = input_field.chars().take(from_left_to_current_index);
+        // Getting all characters after selected character.
+        let after_char_to_delete = input_field.chars().skip(self.character_index);
+
+        // Put all characters together except the selected one.
+        // By leaving the selected one out, it is forgotten and therefore deleted.
+        *input_field = before_char_to_delete.chain(after_char_to_delete).collect();
+        self.move_cursor_left();
+    }
+
+    fn move_cursor_left(&mut self) {
+        let input_field = match self.current_input {
+            JoinInput::Address => &mut self.address,
+            JoinInput::Port => &mut self.port,
+        };
+
+        let cursor_moved_right = self.character_index.saturating_sub(1);
+        self.character_index = cursor_moved_right.clamp(0, input_field.chars().count())
+    }
+
+    fn move_cursor_right(&mut self) {
+        let input_field = match self.current_input {
+            JoinInput::Address => &mut self.address,
+            JoinInput::Port => &mut self.port,
+        };
+
+        let cursor_moved_right = self.character_index.saturating_add(1);
+        self.character_index = cursor_moved_right.clamp(0, input_field.chars().count())
     }
 }
 
@@ -161,11 +266,7 @@ impl AppState {
                     address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
                 })
             }
-            Some(1) => {
-                *self = AppState::Join(JoinConfig {
-                    address: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 8629)),
-                })
-            }
+            Some(1) => *self = AppState::Join(JoinConfig::default()),
             _ => {}
         }
     }
@@ -259,9 +360,35 @@ impl App {
 
         let main_area = center(area, Constraint::Length(30), Constraint::Length(6));
 
-        let main_block =
-            Block::bordered().title(Title::from(format!("Joining {}", join_config.address)));
-        main_block.render(main_area, buf)
+        Block::bordered()
+            .title(Title::from("Enter address and port"))
+            .render(main_area, buf);
+
+        let [address_area, port_area] =
+            Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .areas(main_area);
+
+        let (address_input, port_input) = match join_config.current_input {
+            JoinInput::Address => {
+                App::input_widgets(join_config.address.clone() + "▌", join_config.port.clone())
+            }
+            JoinInput::Port => {
+                App::input_widgets(join_config.address.clone(), join_config.port.clone() + "▌")
+            }
+        };
+
+        address_input.render(address_area, buf);
+        port_input.render(port_area, buf)
+    }
+
+    fn input_widgets(
+        address_text: String,
+        port_text: String,
+    ) -> (Paragraph<'static>, Paragraph<'static>) {
+        let address_input = Paragraph::new(address_text).block(Block::bordered().title("Address:"));
+        let port_input = Paragraph::new(port_text).block(Block::bordered().title("Port:"));
+
+        (address_input, port_input)
     }
 }
 
