@@ -121,7 +121,7 @@ impl App {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
             KeyCode::Esc => self.prev_state(),
-            KeyCode::Enter => self.join(),
+            KeyCode::Enter => self.host(),
             KeyCode::Char(to_insert) => host_config.enter_char(to_insert),
             KeyCode::Backspace => host_config.delete_char(),
             KeyCode::Left => host_config.move_cursor_left(),
@@ -170,6 +170,16 @@ impl App {
         under_control_ler::join(under_control_ler::JoinConfig {
             address: join_config.address.clone(),
             port: join_config.port.clone(),
+        });
+    }
+
+    fn host(&mut self) {
+        let AppState::Host(ref host_config) = self.state else {
+            return;
+        };
+
+        under_control_ler::host(under_control_ler::HostConfig {
+            port: host_config.port.clone(),
         });
     }
 }
