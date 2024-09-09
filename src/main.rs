@@ -11,7 +11,7 @@ use ratatui::{
     },
     DefaultTerminal,
 };
-use std::io;
+use std::{io, sync::mpsc::Receiver};
 
 const SELECTED_STYLE: Style = Style::new()
     .bg(Color::White)
@@ -44,6 +44,7 @@ impl Default for App {
 pub enum AppState {
     ModeSelect(ListState),
     Host(HostConfig),
+    Hosting(HostingState),
     Join(JoinConfig),
 }
 
@@ -51,6 +52,12 @@ pub enum AppState {
 pub struct HostConfig {
     port: String,
     character_index: usize,
+}
+
+#[derive(Debug)]
+pub struct HostingState {
+    messages: Vec<String>,
+    receiver: Receiver<String>,
 }
 
 #[derive(Debug, Default)]
@@ -98,6 +105,7 @@ impl App {
         match self.state {
             AppState::ModeSelect(_) => self.handle_key_event_mode_select(event),
             AppState::Host(_) => self.handel_key_event_host(event),
+            AppState::Hosting(_) => self.handel_events_hosting(event),
             AppState::Join(_) => self.handel_key_event_join(event),
         }
         Ok(())
@@ -127,6 +135,24 @@ impl App {
             KeyCode::Left => host_config.move_cursor_left(),
             KeyCode::Right => host_config.move_cursor_right(),
             _ => {}
+        }
+    }
+
+    fn handel_events_hosting(&mut self, key_event: KeyEvent) {
+        let AppState::Hosting(ref mut hosting_state) = self.state else {
+            return;
+        };
+
+        match key_event.code {
+            KeyCode::Char('q') => {
+                self.exit();
+                return;
+            }
+            _ => {}
+        }
+
+        if let Ok(message) = hosting_state.receiver.try_recv() {
+            hosting_state.messages.push(message);
         }
     }
 
@@ -180,6 +206,11 @@ impl App {
 
         let receiver = under_control_ler::host(under_control_ler::HostConfig {
             port: host_config.port.clone(),
+        });
+
+        self.state = AppState::Hosting(HostingState {
+            messages: Vec::new(),
+            receiver,
         });
     }
 }
@@ -351,6 +382,7 @@ impl Widget for &mut App {
         match &mut self.state {
             AppState::ModeSelect(list_state) => App::render_mode_select(area, buf, list_state),
             AppState::Host(host_config) => App::render_host(area, buf, host_config),
+            AppState::Hosting(hosting_state) => App::render_hosting(area, buf, hosting_state),
             AppState::Join(join_config) => App::render_join(area, buf, join_config),
         }
     }
@@ -420,6 +452,29 @@ impl App {
         let port_input = Paragraph::new(port_text).block(Block::bordered().title("Port:"));
 
         port_input.render(main_area, buf)
+    }
+
+    fn render_hosting(area: Rect, buf: &mut Buffer, hosting_state: &mut HostingState) {
+        let title = Title::from(" Hosting... ".bold());
+        let instructions = Title::from(Line::from(vec![
+            " Quit ".into(),
+            "<Q> ".blue().bold(),
+            " Return ".into(),
+            "<Esc> ".blue().bold(),
+        ]));
+        let block = Block::bordered()
+            .title(title.alignment(Alignment::Center))
+            .title(
+                instructions
+                    .alignment(Alignment::Center)
+                    .position(Position::Bottom),
+            )
+            .border_set(border::THICK);
+        block.render(area, buf);
+
+        let main_area = center(area, Constraint::Length(30), Constraint::Length(3));
+
+        Paragraph::new(hosting_state.messages.join("\n")).render(main_area, buf);
     }
 
     fn render_join(area: Rect, buf: &mut Buffer, join_config: &mut JoinConfig) {
