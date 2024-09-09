@@ -1,12 +1,14 @@
-use std::net::UdpSocket;
+use std::{
+    net::UdpSocket,
+    sync::mpsc::{self, Receiver},
+    thread,
+};
 
-#[derive(Debug)]
 pub struct JoinConfig {
     pub address: String,
     pub port: String,
 }
 
-#[derive(Debug)]
 pub struct HostConfig {
     pub port: String,
 }
@@ -28,15 +30,21 @@ fn make_connection(join_config: JoinConfig) {
     socket.send(b"Test").unwrap();
 }
 
-pub fn host(host_config: HostConfig) {
+pub fn host(host_config: HostConfig) -> Receiver<String> {
     let port = host_config.port;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{port}"))
         .expect(&format!("Failed to bind to port {port}"));
 
     let mut receive_buffer = [];
-    while let Ok((n, addr)) = socket.recv_from(&mut receive_buffer) {
-        println!("{} bytes response from {:?}", n, addr);
-        // Remaining code not directly relevant to the question
-    }
+    let (tx, rx) = mpsc::channel();
+    thread::spawn(move || {
+        while let Ok((n, addr)) = socket.recv_from(&mut receive_buffer) {
+            tx.send(n.to_string()).unwrap();
+            println!("{} bytes response from {:?}", n, addr);
+            // Remaining code not directly relevant to the question
+        }
+    });
+
+    rx
 }

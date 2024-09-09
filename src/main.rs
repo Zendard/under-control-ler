@@ -178,7 +178,7 @@ impl App {
             return;
         };
 
-        under_control_ler::host(under_control_ler::HostConfig {
+        let receiver = under_control_ler::host(under_control_ler::HostConfig {
             port: host_config.port.clone(),
         });
     }
