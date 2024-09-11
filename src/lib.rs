@@ -65,7 +65,7 @@ fn make_connection(join_config: &JoinConfig) -> UdpSocket {
 
     socket
         .connect(join_config.socket)
-        .expect("Failed to connect to {address} on port {port}");
+        .expect(&format!("Failed to connect to {}", join_config.socket));
 
     socket.send(b"Joined").unwrap();
 

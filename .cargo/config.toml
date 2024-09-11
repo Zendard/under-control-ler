@@ -1,0 +1,8 @@
+[target.x86_64-pc-windows-msvc]
+linker = "lld"
+rustflags = [
+  "-Lnative=/home/zendard/.xwin/crt/lib/x86_64",
+  "-Lnative=/home/zendard/.xwin/sdk/lib/um/x86_64",
+  "-Lnative=/home/zendard/.xwin/sdk/lib/ucrt/x86_64"
+]
+
