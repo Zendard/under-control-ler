@@ -11,7 +11,11 @@ use ratatui::{
     },
     DefaultTerminal,
 };
-use std::{io, sync::mpsc::Receiver};
+use std::{
+    io,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 const SELECTED_STYLE: Style = Style::new()
     .bg(Color::White)
@@ -56,8 +60,8 @@ pub struct HostConfig {
 
 #[derive(Debug)]
 pub struct HostingState {
-    messages: Vec<String>,
-    receiver: Receiver<String>,
+    messages: Arc<Mutex<Vec<String>>>,
+    port: String,
 }
 
 #[derive(Debug, Default)]
@@ -139,7 +143,7 @@ impl App {
     }
 
     fn handel_events_hosting(&mut self, key_event: KeyEvent) {
-        let AppState::Hosting(ref mut hosting_state) = self.state else {
+        let AppState::Hosting(_) = self.state else {
             return;
         };
 
@@ -149,10 +153,6 @@ impl App {
                 return;
             }
             _ => {}
-        }
-
-        if let Ok(message) = hosting_state.receiver.try_recv() {
-            hosting_state.messages.push(message);
         }
     }
 
@@ -204,14 +204,20 @@ impl App {
             return;
         };
 
-        let receiver = under_control_ler::host(under_control_ler::HostConfig {
+        self.state = AppState::Hosting(HostingState {
+            messages: Arc::new(Mutex::new(Vec::new())),
             port: host_config.port.clone(),
         });
 
-        self.state = AppState::Hosting(HostingState {
-            messages: Vec::new(),
-            receiver,
-        });
+        let AppState::Hosting(ref hosting_state) = self.state else {
+            return;
+        };
+        under_control_ler::host(
+            under_control_ler::HostConfig {
+                port: hosting_state.port.clone(),
+            },
+            Arc::clone(&hosting_state.messages),
+        )
     }
 }
 
@@ -474,7 +480,8 @@ impl App {
 
         let main_area = center(area, Constraint::Length(30), Constraint::Length(3));
 
-        Paragraph::new(hosting_state.messages.join("\n")).render(main_area, buf);
+        Paragraph::new(hosting_state.messages.clone().lock().unwrap().join("\n"))
+            .render(main_area, buf);
     }
 
     fn render_join(area: Rect, buf: &mut Buffer, join_config: &mut JoinConfig) {

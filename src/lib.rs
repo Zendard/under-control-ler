@@ -1,6 +1,6 @@
 use std::{
     net::UdpSocket,
-    sync::mpsc::{self, Receiver},
+    sync::{Arc, Mutex},
     thread,
 };
 
@@ -15,13 +15,14 @@ pub struct HostConfig {
 
 pub fn join(join_config: JoinConfig) {
     make_connection(join_config)
+    // println!("received {n} from {addr}");
 }
 
 fn make_connection(join_config: JoinConfig) {
     let address = join_config.address;
     let port = join_config.port;
-    let socket = UdpSocket::bind(format!("127.0.0.1:{port}"))
-        .expect(&format!("Failed to bind to port {port}"));
+    let socket = UdpSocket::bind(format!("0.0.0.0:0")).expect(&format!("Failed to bind UdpSocket"));
+    socket.set_broadcast(true).unwrap();
 
     socket
         .connect(format!("{address}:{port}"))
@@ -30,21 +31,19 @@ fn make_connection(join_config: JoinConfig) {
     socket.send(b"Test").unwrap();
 }
 
-pub fn host(host_config: HostConfig) -> Receiver<String> {
+pub fn host(host_config: HostConfig, messages: Arc<Mutex<Vec<String>>>) {
     let port = host_config.port;
 
     let socket = UdpSocket::bind(format!("0.0.0.0:{port}"))
         .expect(&format!("Failed to bind to port {port}"));
 
-    let mut receive_buffer = [];
-    let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        while let Ok((n, addr)) = socket.recv_from(&mut receive_buffer) {
-            tx.send(n.to_string()).unwrap();
-            println!("{} bytes response from {:?}", n, addr);
-            // Remaining code not directly relevant to the question
+        let mut buffer = [];
+        while let Ok(_) = socket.recv_from(&mut buffer) {
+            messages
+                .lock()
+                .unwrap()
+                .push(String::from_utf8(buffer.to_vec()).unwrap_or("Not valid utf-8".to_string()));
         }
     });
-
-    rx
 }
