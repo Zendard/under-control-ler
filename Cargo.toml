@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-gilrs = {version="0.10.9", features=["serde-serialize"]}
+evdev = "0.12.2"
+gilrs = { version = "0.10.9", default-features=false, features = ["serde-serialize", "xinput"] }
 serde = {version="1.0.210", features=["derive"]}
 serde_json = "1.0.128"
