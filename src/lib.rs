@@ -1,50 +1,92 @@
 use std::{
-    net::UdpSocket,
-    sync::mpsc::{self, Receiver},
+    net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket},
+    str::FromStr,
     thread,
 };
 
 pub struct JoinConfig {
-    pub address: String,
-    pub port: String,
+    socket: SocketAddr,
+}
+
+impl JoinConfig {
+    fn new(args: &Vec<String>) -> JoinConfig {
+        let ip_address = args.get(2).expect("Please enter an address");
+        let ip_address = IpAddr::from_str(ip_address).expect("Please enter a valid ipv4 or ipv6");
+
+        let default_port = "8629".to_string();
+        let port = args.get(3).unwrap_or(&default_port);
+        let port: u16 = port.parse().expect("Port number must be u16");
+
+        let socket = SocketAddr::new(ip_address, port);
+
+        JoinConfig { socket }
+    }
 }
 
 pub struct HostConfig {
-    pub port: String,
+    pub port: u16,
 }
 
-pub fn join(join_config: JoinConfig) {
-    make_connection(join_config)
+impl HostConfig {
+    fn new(args: &Vec<String>) -> HostConfig {
+        let default_port = "8629".to_string();
+        let port = args.get(2).unwrap_or(&default_port);
+        let port: u16 = port.parse().expect("Port number must be u16");
+
+        HostConfig { port }
+    }
 }
 
-fn make_connection(join_config: JoinConfig) {
-    let address = join_config.address;
-    let port = join_config.port;
-    let socket = UdpSocket::bind(format!("127.0.0.1:{port}"))
-        .expect(&format!("Failed to bind to port {port}"));
+#[derive(Debug)]
+struct RawMessage {
+    data: [u8; 10],
+    length: usize,
+    origin: SocketAddr,
+}
+
+pub fn join(args: &Vec<String>) {
+    let config = JoinConfig::new(args);
+
+    make_connection(&config)
+}
+
+pub fn host(args: &Vec<String>) {
+    let config = HostConfig::new(args);
+
+    open_port(&config);
+}
+
+fn make_connection(join_config: &JoinConfig) {
+    let socket = UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0))
+        .expect("Failed to bind socket");
 
     socket
-        .connect(format!("{address}:{port}"))
+        .connect(join_config.socket)
         .expect("Failed to connect to {address} on port {port}");
 
     socket.send(b"Test").unwrap();
 }
 
-pub fn host(host_config: HostConfig) -> Receiver<String> {
-    let port = host_config.port;
+fn open_port(config: &HostConfig) {
+    let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), config.port))
+        .expect("Failed to vind to port");
 
-    let socket = UdpSocket::bind(format!("0.0.0.0:{port}"))
-        .expect(&format!("Failed to bind to port {port}"));
+    let mut receive_buffer = [0; 10];
+    while let Ok((length, origin)) = socket.recv_from(&mut receive_buffer) {
+        let data = receive_buffer.clone();
+        let message = RawMessage {
+            data,
+            length,
+            origin,
+        };
+        thread::spawn(move || handle_receive(message));
+    }
+}
 
-    let mut receive_buffer = [];
-    let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        while let Ok((n, addr)) = socket.recv_from(&mut receive_buffer) {
-            tx.send(n.to_string()).unwrap();
-            println!("{} bytes response from {:?}", n, addr);
-            // Remaining code not directly relevant to the question
-        }
-    });
-
-    rx
+fn handle_receive(message: RawMessage) {
+    let data = &message.data[..message.length];
+    dbg!(&message);
+    dbg!(&data);
+    let message_string = String::from_utf8(data.to_vec()).unwrap_or("Not valid utf-8".to_string());
+    dbg!(message_string);
 }
