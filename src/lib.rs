@@ -56,6 +56,11 @@ impl VirtualGamepad {
         keys.insert(Key::BTN_WEST);
         keys.insert(Key::BTN_SOUTH);
 
+        keys.insert(Key::BTN_DPAD_UP);
+        keys.insert(Key::BTN_DPAD_DOWN);
+        keys.insert(Key::BTN_DPAD_LEFT);
+        keys.insert(Key::BTN_DPAD_RIGHT);
+
         let gamepad = VirtualDeviceBuilder::new()?
             .name("Under Control(ler) Virtual Gamepad")
             .with_keys(&keys)?
@@ -148,7 +153,7 @@ fn open_port(config: &HostConfig) {
         let message = RawMessage {
             data,
             length,
-            origin,
+            _origin: origin,
         };
         let gamepad = Arc::clone(&gamepad);
         thread::spawn(move || handle_receive(message, gamepad));
@@ -171,25 +176,28 @@ fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
 }
 
 fn handle_button_pressed(button: Button, gamepad: Arc<Mutex<VirtualGamepad>>) {
-    let key = match button {
-        Button::North => Key::BTN_NORTH,
-        Button::East => Key::BTN_EAST,
-        Button::West => Key::BTN_WEST,
-        Button::South => Key::BTN_SOUTH,
-        _ => Key::BTN_NORTH,
-    };
+    let key = translate_button(button);
 
     gamepad.lock().unwrap().press_key(key);
 }
 
 fn handle_button_released(button: Button, gamepad: Arc<Mutex<VirtualGamepad>>) {
-    let key = match button {
+    let key = translate_button(button);
+
+    gamepad.lock().unwrap().release_key(key);
+}
+
+fn translate_button(button: Button) -> Key {
+    match button {
         Button::North => Key::BTN_NORTH,
         Button::East => Key::BTN_EAST,
         Button::West => Key::BTN_WEST,
         Button::South => Key::BTN_SOUTH,
-        _ => Key::BTN_NORTH,
-    };
 
-    gamepad.lock().unwrap().release_key(key);
+        Button::DPadUp => Key::BTN_DPAD_UP,
+        Button::DPadDown => Key::BTN_DPAD_DOWN,
+        Button::DPadLeft => Key::BTN_DPAD_LEFT,
+        Button::DPadRight => Key::BTN_DPAD_RIGHT,
+        _ => Key::BTN_NORTH,
+    }
 }
