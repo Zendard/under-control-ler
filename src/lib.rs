@@ -2,11 +2,9 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket},
     str::FromStr,
     thread,
-    time::Duration,
 };
 
-use gilrs::{EventType, Gamepad, GamepadId, Gilrs};
-use serde::Serialize;
+use gilrs::{EventType, Gilrs};
 
 pub struct JoinConfig {
     socket: SocketAddr,
@@ -43,7 +41,7 @@ impl HostConfig {
 
 #[derive(Debug)]
 struct RawMessage {
-    data: [u8; 10],
+    data: [u8; 68],
     length: usize,
     origin: SocketAddr,
 }
@@ -76,7 +74,6 @@ fn make_connection(join_config: &JoinConfig) -> UdpSocket {
 
 fn send_controller_inputs(socket: UdpSocket) {
     let mut girls = Gilrs::new().unwrap();
-    let controller = girls.gamepads().next().unwrap().1;
 
     loop {
         handle_controller_event(&mut girls, &socket)
@@ -93,14 +90,17 @@ fn handle_controller_event(girls: &mut Gilrs, socket: &UdpSocket) {
 fn send_controller_event(event: EventType, socket: &UdpSocket) {
     let event_string = serde_json::to_string(&event).unwrap();
     let buffer: &[u8] = event_string.as_bytes();
-    socket.send(buffer).unwrap();
+    socket.send(buffer).unwrap_or_else(|error| {
+        eprintln!("{}", error);
+        0
+    });
 }
 
 fn open_port(config: &HostConfig) {
     let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), config.port))
-        .expect("Failed to vind to port");
+        .expect("Failed to bind to port");
 
-    let mut receive_buffer = [0; 10];
+    let mut receive_buffer = [0; 68];
     while let Ok((length, origin)) = socket.recv_from(&mut receive_buffer) {
         let data = receive_buffer.clone();
         let message = RawMessage {
@@ -114,8 +114,7 @@ fn open_port(config: &HostConfig) {
 
 fn handle_receive(message: RawMessage) {
     let data = &message.data[..message.length];
-    dbg!(&message);
-    dbg!(&data);
     let message_string = String::from_utf8(data.to_vec()).unwrap_or("Not valid utf-8".to_string());
-    dbg!(message_string);
+    let event: Option<EventType> = serde_json::from_str(&message_string).unwrap_or(None);
+    dbg!(event);
 }
