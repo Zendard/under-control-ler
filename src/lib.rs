@@ -61,6 +61,9 @@ impl VirtualGamepad {
         keys.insert(Key::BTN_DPAD_LEFT);
         keys.insert(Key::BTN_DPAD_RIGHT);
 
+        keys.insert(Key::BTN_SELECT);
+        keys.insert(Key::BTN_START);
+
         let gamepad = VirtualDeviceBuilder::new()?
             .name("Under Control(ler) Virtual Gamepad")
             .with_keys(&keys)?
@@ -198,6 +201,10 @@ fn translate_button(button: Button) -> Key {
         Button::DPadDown => Key::BTN_DPAD_DOWN,
         Button::DPadLeft => Key::BTN_DPAD_LEFT,
         Button::DPadRight => Key::BTN_DPAD_RIGHT,
+
+        Button::Select => Key::BTN_SELECT,
+        Button::Start => Key::BTN_START,
+
         _ => Key::BTN_NORTH,
     }
 }
