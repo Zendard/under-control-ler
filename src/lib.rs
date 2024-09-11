@@ -4,14 +4,13 @@ use std::{
     str::FromStr,
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
 };
 
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
-    AttributeSet, AttributeSetRef, BusType, InputEvent, InputId, Key,
+    AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
 };
-use gilrs::{Button, EventType, Gamepad, GamepadId, Gilrs};
+use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs};
 
 pub struct JoinConfig {
     socket: SocketAddr,
@@ -48,6 +47,8 @@ impl HostConfig {
 
 struct VirtualGamepad(VirtualDevice);
 
+const JOYSTICK_RANGE: isize = 32768 + 32767;
+
 impl VirtualGamepad {
     fn new() -> Result<Self, Box<dyn Error>> {
         let mut keys = AttributeSet::new();
@@ -67,9 +68,24 @@ impl VirtualGamepad {
         keys.insert(Key::BTN_TL);
         keys.insert(Key::BTN_TR);
 
+        keys.insert(Key::BTN_THUMBL);
+        keys.insert(Key::BTN_THUMBR);
+
+        let abs_setup = AbsInfo::new(2293, -32768, 32767, 16, 128, 1);
+        let left_x = UinputAbsSetup::new(AbsoluteAxisType::ABS_X, abs_setup);
+        let left_y = UinputAbsSetup::new(AbsoluteAxisType::ABS_Y, abs_setup);
+
+        let right_x = UinputAbsSetup::new(AbsoluteAxisType::ABS_RX, abs_setup);
+        let right_y = UinputAbsSetup::new(AbsoluteAxisType::ABS_RY, abs_setup);
+
         let gamepad = VirtualDeviceBuilder::new()?
             .name("Under Control(ler) Virtual Gamepad")
+            .input_id(InputId::new(BusType::BUS_USB, 8629, 8629, 1))
             .with_keys(&keys)?
+            .with_absolute_axis(&left_x)?
+            .with_absolute_axis(&left_y)?
+            .with_absolute_axis(&right_x)?
+            .with_absolute_axis(&right_y)?
             .build()?;
 
         Ok(VirtualGamepad(gamepad))
@@ -83,6 +99,18 @@ impl VirtualGamepad {
     fn release_key(&mut self, key: Key) {
         self.0
             .emit(&[InputEvent::new(evdev::EventType::KEY, key.code(), 0)])
+            .unwrap()
+    }
+
+    fn set_axis(&mut self, axis: AbsoluteAxisType, value: f32) {
+        let mut value = (value * JOYSTICK_RANGE as f32) as i32 - 32767;
+
+        if AbsoluteAxisType::ABS_Y == axis || AbsoluteAxisType::ABS_RY == axis {
+            value = -value
+        }
+
+        self.0
+            .emit(&[InputEvent::new(evdev::EventType::ABSOLUTE, axis.0, value)])
             .unwrap()
     }
 }
@@ -122,7 +150,10 @@ fn make_connection(join_config: &JoinConfig) -> UdpSocket {
 
 fn send_controller_inputs(socket: UdpSocket) {
     let mut girls = Gilrs::new().unwrap();
-    dbg!(girls.gamepads().collect::<Vec<(GamepadId, Gamepad)>>());
+    dbg!(girls
+        .gamepads()
+        .map(|gamepad| gamepad.1.name().to_string())
+        .collect::<Vec<String>>());
 
     loop {
         handle_controller_event(&mut girls, &socket)
@@ -131,7 +162,16 @@ fn send_controller_inputs(socket: UdpSocket) {
 
 fn handle_controller_event(girls: &mut Gilrs, socket: &UdpSocket) {
     while let Some(event) = girls.next_event() {
+        if girls.gamepad(event.id).vendor_id() == Some(8629) {
+            return;
+        }
+
+        if let EventType::AxisChanged(..) = event.event {
+            dbg!(girls.gamepad(event.id).vendor_id());
+        }
+
         let event = event.event;
+
         send_controller_event(event, socket);
     }
 }
@@ -177,6 +217,8 @@ fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
     match event {
         EventType::ButtonPressed(button, _) => handle_button_pressed(button, gamepad),
         EventType::ButtonReleased(button, _) => handle_button_released(button, gamepad),
+
+        EventType::AxisChanged(axis, value, _) => handle_axis_changed(axis, value, gamepad),
         _ => {}
     }
 }
@@ -211,6 +253,26 @@ fn translate_button(button: Button) -> Key {
         Button::LeftTrigger => Key::BTN_TL,
         Button::RightTrigger => Key::BTN_TR,
 
+        Button::LeftThumb => Key::BTN_THUMBL,
+        Button::RightThumb => Key::BTN_THUMBR,
+
         _ => Key::BTN_NORTH,
+    }
+}
+
+fn handle_axis_changed(axis: Axis, value: f32, gamepad: Arc<Mutex<VirtualGamepad>>) {
+    let axis = translate_axis(axis);
+    gamepad.lock().unwrap().set_axis(axis, value);
+}
+
+fn translate_axis(axis: Axis) -> AbsoluteAxisType {
+    match axis {
+        Axis::LeftStickX => AbsoluteAxisType::ABS_X,
+        Axis::LeftStickY => AbsoluteAxisType::ABS_Y,
+
+        Axis::RightStickX => AbsoluteAxisType::ABS_RX,
+        Axis::RightStickY => AbsoluteAxisType::ABS_RY,
+
+        _ => AbsoluteAxisType::ABS_X,
     }
 }
