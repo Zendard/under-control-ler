@@ -139,10 +139,16 @@ pub fn join(args: &[String]) {
     send_controller_inputs(socket);
 }
 
+#[cfg(target_os = "linux")]
 pub fn host(args: &[String]) {
     let config = HostConfig::new(args);
 
     open_port(&config);
+}
+
+#[cfg(target_os = "windows")]
+pub fn host(args: &[String]) {
+    println!("Hosting not yet possible on windows");
 }
 
 fn make_connection(join_config: &JoinConfig) -> UdpSocket {
