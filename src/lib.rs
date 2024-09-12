@@ -48,6 +48,7 @@ impl HostConfig {
 struct VirtualGamepad(VirtualDevice);
 
 const JOYSTICK_RANGE: isize = 32768;
+const TRIGGER_RANGE: isize = 1023;
 
 impl VirtualGamepad {
     fn new() -> Result<Self, Box<dyn Error>> {
@@ -72,11 +73,15 @@ impl VirtualGamepad {
         keys.insert(Key::BTN_THUMBR);
 
         let abs_setup = AbsInfo::new(2293, -32768, 32767, 16, 128, 1);
+        let trigger_setup = AbsInfo::new(2293, 0, 1023, 16, 128, 1);
         let left_x = UinputAbsSetup::new(AbsoluteAxisType::ABS_X, abs_setup);
         let left_y = UinputAbsSetup::new(AbsoluteAxisType::ABS_Y, abs_setup);
 
         let right_x = UinputAbsSetup::new(AbsoluteAxisType::ABS_RX, abs_setup);
         let right_y = UinputAbsSetup::new(AbsoluteAxisType::ABS_RY, abs_setup);
+
+        let left_trigger = UinputAbsSetup::new(AbsoluteAxisType::ABS_Z, trigger_setup);
+        let right_trigger = UinputAbsSetup::new(AbsoluteAxisType::ABS_RZ, trigger_setup);
 
         let gamepad = VirtualDeviceBuilder::new()?
             .name("Under Control(ler) Virtual Gamepad")
@@ -86,19 +91,16 @@ impl VirtualGamepad {
             .with_absolute_axis(&left_y)?
             .with_absolute_axis(&right_x)?
             .with_absolute_axis(&right_y)?
+            .with_absolute_axis(&left_trigger)?
+            .with_absolute_axis(&right_trigger)?
             .build()?;
 
         Ok(VirtualGamepad(gamepad))
     }
 
-    fn press_key(&mut self, key: Key) {
+    fn set_key(&mut self, key: Key, value: i32) {
         self.0
-            .emit(&[InputEvent::new(evdev::EventType::KEY, key.code(), 1)])
-            .unwrap()
-    }
-    fn release_key(&mut self, key: Key) {
-        self.0
-            .emit(&[InputEvent::new(evdev::EventType::KEY, key.code(), 0)])
+            .emit(&[InputEvent::new(evdev::EventType::KEY, key.code(), value)])
             .unwrap()
     }
 
@@ -108,6 +110,14 @@ impl VirtualGamepad {
         if AbsoluteAxisType::ABS_Y == axis || AbsoluteAxisType::ABS_RY == axis {
             value = -value
         }
+
+        self.0
+            .emit(&[InputEvent::new(evdev::EventType::ABSOLUTE, axis.0, value)])
+            .unwrap()
+    }
+
+    fn set_trigger(&mut self, axis: AbsoluteAxisType, value: f32) {
+        let value = (value * TRIGGER_RANGE as f32) as i32;
 
         self.0
             .emit(&[InputEvent::new(evdev::EventType::ABSOLUTE, axis.0, value)])
@@ -218,24 +228,27 @@ fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let Some(event) = event else { return };
 
     match event {
-        EventType::ButtonPressed(button, _) => handle_button_pressed(button, gamepad),
-        EventType::ButtonReleased(button, _) => handle_button_released(button, gamepad),
-
+        EventType::ButtonChanged(button, value, _) => handle_button_changed(button, value, gamepad),
         EventType::AxisChanged(axis, value, _) => handle_axis_changed(axis, value, gamepad),
         _ => {}
     }
 }
 
-fn handle_button_pressed(button: Button, gamepad: Arc<Mutex<VirtualGamepad>>) {
+fn handle_button_changed(button: Button, value: f32, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let key = translate_button(button);
 
-    gamepad.lock().unwrap().press_key(key);
-}
-
-fn handle_button_released(button: Button, gamepad: Arc<Mutex<VirtualGamepad>>) {
-    let key = translate_button(button);
-
-    gamepad.lock().unwrap().release_key(key);
+    match button {
+        Button::LeftTrigger2 => gamepad
+            .lock()
+            .unwrap()
+            .set_trigger(AbsoluteAxisType::ABS_Z, value),
+        Button::RightTrigger2 => gamepad
+            .lock()
+            .unwrap()
+            .set_trigger(AbsoluteAxisType::ABS_RZ, value),
+        _ => {}
+    };
+    gamepad.lock().unwrap().set_key(key, value as i32);
 }
 
 fn translate_button(button: Button) -> Key {
