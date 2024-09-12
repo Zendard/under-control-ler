@@ -28,6 +28,6 @@ Share gamepad inputs peer-to-peer (WIP)
 `.\under-control-ler.exe join <address> [port]`
 ## Compatibility
 ### Hosting
-- Hosting is currently only possible on linux and spawns a virtual Xbox 360 gamepad using uinput
+- Hosting is currently only possible on linux as it spawns a virtual Xbox 360 gamepad using uinput
 ### Joining
 - I only own an Xbox one gamepad but all gamepads supporting Xinput on windows and evdev on linux should work
