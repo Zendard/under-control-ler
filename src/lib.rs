@@ -6,6 +6,7 @@ use std::{
     thread,
 };
 
+#[cfg(target_os = "linux")]
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
@@ -45,11 +46,13 @@ impl HostConfig {
     }
 }
 
+#[cfg(target_os = "linux")]
 struct VirtualGamepad(VirtualDevice);
 
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
+#[cfg(target_os = "linux")]
 impl VirtualGamepad {
     fn new() -> Result<Self, Box<dyn Error>> {
         let mut keys = AttributeSet::new();
@@ -203,6 +206,7 @@ fn send_controller_event(event: EventType, socket: &UdpSocket) {
     });
 }
 
+#[cfg(target_os = "linux")]
 fn open_port(config: &HostConfig) {
     let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), config.port))
         .expect("Failed to bind to port");
@@ -225,6 +229,7 @@ fn open_port(config: &HostConfig) {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let data = &message.data[..message.length];
     let message_string = String::from_utf8(data.to_vec()).unwrap_or("Not valid utf-8".to_string());
@@ -240,6 +245,7 @@ fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn handle_button_changed(button: Button, value: f32, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let key = translate_button(button);
 
@@ -257,6 +263,7 @@ fn handle_button_changed(button: Button, value: f32, gamepad: Arc<Mutex<VirtualG
     gamepad.lock().unwrap().set_key(key, value as i32);
 }
 
+#[cfg(target_os = "linux")]
 fn translate_button(button: Button) -> Key {
     match button {
         Button::North => Key::BTN_NORTH,
@@ -282,11 +289,13 @@ fn translate_button(button: Button) -> Key {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn handle_axis_changed(axis: Axis, value: f32, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let axis = translate_axis(axis);
     gamepad.lock().unwrap().set_axis(axis, value);
 }
 
+#[cfg(target_os = "linux")]
 fn translate_axis(axis: Axis) -> AbsoluteAxisType {
     match axis {
         Axis::LeftStickX => AbsoluteAxisType::ABS_X,
