@@ -10,7 +10,7 @@ use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
 };
-use gilrs::{Axis, Button, EventType, Gamepad, GamepadId, Gilrs};
+use gilrs::{Axis, Button, EventType, Gilrs};
 
 pub struct JoinConfig {
     socket: SocketAddr,
@@ -47,7 +47,7 @@ impl HostConfig {
 
 struct VirtualGamepad(VirtualDevice);
 
-const JOYSTICK_RANGE: isize = 32768 + 32767;
+const JOYSTICK_RANGE: isize = 32768;
 
 impl VirtualGamepad {
     fn new() -> Result<Self, Box<dyn Error>> {
@@ -103,7 +103,7 @@ impl VirtualGamepad {
     }
 
     fn set_axis(&mut self, axis: AbsoluteAxisType, value: f32) {
-        let mut value = (value * JOYSTICK_RANGE as f32) as i32 - 32767;
+        let mut value = (value * JOYSTICK_RANGE as f32) as i32;
 
         if AbsoluteAxisType::ABS_Y == axis || AbsoluteAxisType::ABS_RY == axis {
             value = -value
@@ -150,10 +150,16 @@ fn make_connection(join_config: &JoinConfig) -> UdpSocket {
 
 fn send_controller_inputs(socket: UdpSocket) {
     let mut girls = Gilrs::new().unwrap();
-    dbg!(girls
+    let gamepad_names = girls
         .gamepads()
         .map(|gamepad| gamepad.1.name().to_string())
-        .collect::<Vec<String>>());
+        .collect::<Vec<String>>();
+
+    println!("Detected gamepads: {:?}", gamepad_names);
+    println!(
+        "Connected to {}, sending inputs...",
+        &socket.peer_addr().unwrap()
+    );
 
     loop {
         handle_controller_event(&mut girls, &socket)
@@ -164,10 +170,6 @@ fn handle_controller_event(girls: &mut Gilrs, socket: &UdpSocket) {
     while let Some(event) = girls.next_event() {
         if girls.gamepad(event.id).vendor_id() == Some(8629) {
             return;
-        }
-
-        if let EventType::AxisChanged(..) = event.event {
-            dbg!(girls.gamepad(event.id).vendor_id());
         }
 
         let event = event.event;
@@ -190,10 +192,11 @@ fn open_port(config: &HostConfig) {
         .expect("Failed to bind to port");
 
     let gamepad = VirtualGamepad::new().unwrap();
-
+    println!("Made virtual gamepad");
     let gamepad = Arc::new(Mutex::new(gamepad));
 
     let mut receive_buffer = [0; 100];
+    println!("Waiting for inputs...");
     while let Ok((length, origin)) = socket.recv_from(&mut receive_buffer) {
         let data = receive_buffer;
         let message = RawMessage {
