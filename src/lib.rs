@@ -11,7 +11,7 @@ use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
 };
-use gilrs::{Axis, Button, EventType, Gilrs};
+use gilrs::{ev::AxisOrBtn, Axis, Button, EventType, Gilrs};
 
 pub struct JoinConfig {
     socket: SocketAddr,
@@ -198,7 +198,7 @@ fn handle_controller_event(girls: &mut Gilrs, socket: &UdpSocket) {
 }
 
 fn send_controller_event(event: EventType, socket: &UdpSocket) {
-    let event_string = serde_json::to_string(&event).unwrap();
+    let event_string = SimpleEventType(event).to_universal_string();
     let buffer: &[u8] = event_string.as_bytes();
     socket.send(buffer).unwrap_or_else(|error| {
         eprintln!("{}", error);
@@ -233,15 +233,50 @@ fn open_port(config: &HostConfig) {
 fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {
     let data = &message.data[..message.length];
     let message_string = String::from_utf8(data.to_vec()).unwrap_or("Not valid utf-8".to_string());
-    let event: Option<EventType> = serde_json::from_str(&message_string).unwrap_or(None);
-    // println!("{:#?}: {}", event, message.origin);
+    let event: Option<(AxisOrBtn, f32)> = SimpleEventType::from_string(&message_string);
 
     let Some(event) = event else { return };
 
-    match event {
-        EventType::ButtonChanged(button, value, _) => handle_button_changed(button, value, gamepad),
-        EventType::AxisChanged(axis, value, _) => handle_axis_changed(axis, value, gamepad),
-        _ => {}
+    match event.0 {
+        AxisOrBtn::Btn(button) => handle_button_changed(button, event.1, gamepad),
+        AxisOrBtn::Axis(axis) => handle_axis_changed(axis, event.1, gamepad),
+    }
+}
+
+#[derive(Debug)]
+struct SimpleEventType(EventType);
+
+impl SimpleEventType {
+    fn to_universal_string(&self) -> String {
+        match self.0 {
+            EventType::ButtonChanged(button, value, _) => {
+                format!("b,{},{}", serde_json::to_string(&button).unwrap(), value)
+            }
+            EventType::AxisChanged(axis, value, _) => {
+                format!(
+                    "a,{:?},{}",
+                    serde_json::to_string(&axis)
+                        .unwrap()
+                        .replace("\"", "")
+                        .replace("\\", ""),
+                    value
+                )
+            }
+            _ => "".to_string(),
+        }
+    }
+
+    fn from_string(string: &str) -> Option<(AxisOrBtn, f32)> {
+        let mut parts = string.split(',');
+        let variant = parts.next()?;
+        let name = parts.next()?;
+        let value = parts.next()?.parse::<f32>().ok()?;
+
+        match variant {
+            "b" => Some((AxisOrBtn::Btn(serde_json::from_str(&name).ok()?), value)),
+            "a" => Some((AxisOrBtn::Axis(serde_json::from_str(&name).ok()?), value)),
+            _ => None,
+        }
     }
 }
 
