@@ -9,7 +9,7 @@ Share gamepad inputs peer-to-peer (WIP)
 | D-pad | ✅ | ✅
 | Joysticks (left+right) | ✅ | ✅
 | Bumpers | ✅ | ✅
-| Triggers | ❌ | ❌
+| Triggers | ✅ | ✅
 | Select + Start | ✅ | ✅
 | Joysick press | ✅ | ✅
 ## Usage
