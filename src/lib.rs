@@ -42,13 +42,6 @@ impl HostConfig {
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
-#[derive(Debug)]
-struct RawMessage {
-    data: [u8; 100],
-    length: usize,
-    _origin: SocketAddr,
-}
-
 pub fn join(args: &[String]) {
     let config = JoinConfig::new(args);
 

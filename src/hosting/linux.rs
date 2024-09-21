@@ -1,11 +1,12 @@
-use crate::{HostConfig, RawMessage, SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE};
+use crate::{hosting::RawMessage, HostConfig, SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE};
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
 };
 use std::{
     error::Error,
-    net::{Ipv4Addr, SocketAddrV4, UdpSocket},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket},
+    rc::Rc,
     sync::{Arc, Mutex},
     thread,
 };
@@ -89,6 +90,11 @@ impl VirtualGamepad {
     }
 }
 
+struct Client {
+    pub gamepad: Arc<Mutex<VirtualGamepad>>,
+    pub address: SocketAddr,
+}
+
 pub fn host(args: &[String]) {
     let config = HostConfig::new(args);
 
@@ -99,9 +105,7 @@ fn open_port(config: &HostConfig) {
     let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), config.port))
         .expect("Failed to bind to port");
 
-    let gamepad = VirtualGamepad::new().unwrap();
-    println!("Made virtual gamepad");
-    let gamepad = Arc::new(Mutex::new(gamepad));
+    let clients: Rc<Mutex<Vec<Client>>> = Rc::new(Mutex::new(Vec::new()));
 
     let mut receive_buffer = [0; 100];
     println!("Waiting for inputs...");
@@ -110,10 +114,42 @@ fn open_port(config: &HostConfig) {
         let message = RawMessage {
             data,
             length,
-            _origin: origin,
+            origin,
         };
-        let gamepad = Arc::clone(&gamepad);
-        thread::spawn(move || handle_receive(message, gamepad));
+        let gamepad = find_or_create_client(message.origin, clients.clone());
+        if gamepad.is_none() {
+            continue;
+        }
+        thread::spawn(move || handle_receive(message, gamepad.unwrap()));
+    }
+}
+
+fn find_or_create_client(
+    address: SocketAddr,
+    clients: Rc<Mutex<Vec<Client>>>,
+) -> Option<Arc<Mutex<VirtualGamepad>>> {
+    let mut clients = clients.lock().unwrap();
+    let client = clients.iter().find(|client| client.address == address);
+
+    match client {
+        None => {
+            let confirmation = dialoguer::Confirm::new()
+                .with_prompt(format!("Accept connection from {address}?"))
+                .interact()
+                .unwrap();
+
+            if confirmation {
+                let gamepad = Arc::new(Mutex::new(VirtualGamepad::new().ok()?));
+                clients.push(Client {
+                    gamepad: gamepad.clone(),
+                    address,
+                });
+                Some(gamepad)
+            } else {
+                None
+            }
+        }
+        Some(client) => Some(client.gamepad.clone()),
     }
 }
 
