@@ -13,17 +13,16 @@ Share gamepad inputs peer-to-peer (WIP)
 | Select + Start | ✅ | ✅
 | Joysick press | ✅ | ✅
 ## Usage
-### Prerequisites
-#### Linux
-- Make the program executable: `sudo chmod a+x under-control-ler`
 ### Hosting
 #### Linux
-`./under-control-ler host [port]`
+- Make the program executable: `sudo chmod a+x under-control-ler`
+- Start hosting: `./under-control-ler host [port]`
 #### Windows
 `.\under-control-ler.exe host [port]`
 ### Joining
 #### Linux
-`./under-control-ler join <address> [port]`
+- Make the program executable: `sudo chmod a+x under-control-ler`
+- Join: `./under-control-ler join <address> [port]`
 #### Windows
 `.\under-control-ler.exe join <address> [port]`
 ## Compatibility
@@ -31,3 +30,4 @@ Share gamepad inputs peer-to-peer (WIP)
 - Hosting is currently only possible on linux as it spawns a virtual Xbox 360 gamepad using uinput
 ### Joining
 - I only own an Xbox one gamepad but all gamepads supporting Xinput on windows and evdev on linux should work
+- Use [DS4Windows](https://github.com/Ryochan7/DS4Windows/releases) for Playstation controllers
