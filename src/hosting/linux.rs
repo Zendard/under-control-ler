@@ -1,4 +1,4 @@
-use crate::{hosting::RawMessage, HostConfig, SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE};
+use crate::{hosting::RawMessage, SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE};
 use evdev::{
     uinput::{VirtualDevice, VirtualDeviceBuilder},
     AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
@@ -95,33 +95,34 @@ struct Client {
     pub address: SocketAddr,
 }
 
-pub fn host(args: &[String]) {
-    let config = HostConfig::new(args);
-
-    open_port(&config);
-}
-
-fn open_port(config: &HostConfig) {
-    let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), config.port))
-        .expect("Failed to bind to port");
+pub fn host(port: u16, stop: Arc<Mutex<bool>>) {
+    let socket = open_port(port);
 
     let clients: Rc<Mutex<Vec<Client>>> = Rc::new(Mutex::new(Vec::new()));
 
     let mut receive_buffer = [0; 100];
     println!("Waiting for inputs...");
-    while let Ok((length, origin)) = socket.recv_from(&mut receive_buffer) {
-        let data = receive_buffer;
-        let message = RawMessage {
-            data,
-            length,
-            origin,
-        };
-        let gamepad = find_or_create_client(message.origin, clients.clone());
-        if gamepad.is_none() {
-            continue;
+    while !*stop.lock().unwrap() {
+        if let Ok((length, origin)) = socket.recv_from(&mut receive_buffer) {
+            let data = receive_buffer;
+            let message = RawMessage {
+                data,
+                length,
+                origin,
+            };
+            let gamepad = find_or_create_client(message.origin, clients.clone());
+            if gamepad.is_none() {
+                continue;
+            }
+            thread::spawn(move || handle_receive(message, gamepad.unwrap()));
         }
-        thread::spawn(move || handle_receive(message, gamepad.unwrap()));
     }
+    println!("Stopped hosting");
+}
+
+fn open_port(port: u16) -> UdpSocket {
+    UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port))
+        .expect("Failed to bind to port")
 }
 
 fn find_or_create_client(

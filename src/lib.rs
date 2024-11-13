@@ -6,20 +6,6 @@ use std::{
 #[cfg(target_os = "linux")]
 mod hosting;
 
-pub struct HostConfig {
-    pub port: u16,
-}
-
-impl HostConfig {
-    fn new(args: &[String]) -> HostConfig {
-        let default_port = "8629".to_string();
-        let port = args.get(2).unwrap_or(&default_port);
-        let port: u16 = port.parse().expect("Port number must be u16");
-
-        HostConfig { port }
-    }
-}
-
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
@@ -29,8 +15,8 @@ pub fn join(address: SocketAddr, stop: Arc<Mutex<bool>>) {
 }
 
 #[cfg(target_os = "linux")]
-pub fn host(args: &[String]) {
-    crate::hosting::linux::host(args);
+pub fn host(port: u16, stop: Arc<Mutex<bool>>) {
+    crate::hosting::linux::host(port, stop);
 }
 
 #[cfg(target_os = "windows")]

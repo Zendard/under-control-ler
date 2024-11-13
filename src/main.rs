@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use iced::Element;
+mod host;
 mod index;
 mod join;
 mod joined;
@@ -21,13 +22,14 @@ enum Message {
     Index(index::IndexMessage),
     Join(join::JoinMessage),
     Joined(joined::JoinedMessage),
+    Host(host::HostMessage),
 }
 
 enum Screen {
     Index(index::Index),
     Join(join::Join),
     Joined(joined::Joined),
-    Host,
+    Host(host::Host),
 }
 
 impl Default for Screen {
@@ -41,7 +43,7 @@ impl App {
         match message {
             Message::Index(message) => match message {
                 index::IndexMessage::Join => self.screen = Screen::Join(join::Join::default()),
-                index::IndexMessage::Host => self.screen = Screen::Host,
+                index::IndexMessage::Host => self.host(),
             },
             Message::Join(message) => match message {
                 join::JoinMessage::Join => self.join(),
@@ -54,6 +56,14 @@ impl App {
             Message::Joined(message) => match message {
                 joined::JoinedMessage::Leave => self.leave(),
             },
+            Message::Host(message) => match message {
+                host::HostMessage::Stop => self.stop_hosting(),
+                _ => {
+                    if let Screen::Host(state) = &mut self.screen {
+                        state.update(message)
+                    }
+                }
+            },
         }
     }
 
@@ -62,7 +72,7 @@ impl App {
             Screen::Index(index) => index::Index::view(index),
             Screen::Join(join) => join::Join::view(join),
             Screen::Joined(joined) => joined::Joined::view(joined),
-            Screen::Host => todo!(),
+            Screen::Host(host) => host::Host::view(host),
         }
     }
 
@@ -81,7 +91,25 @@ impl App {
 
     fn leave(&mut self) {
         if let Screen::Joined(joined) = &self.screen {
-            *joined.stop.lock().unwrap() = true;
+            joined.leave();
+            self.screen = Screen::Index(index::Index)
+        }
+    }
+
+    fn host(&mut self) {
+        if let Screen::Index(_) = &self.screen {
+            let stop = Arc::new(Mutex::new(false));
+            self.screen = Screen::Host(host::Host {
+                clients: Vec::new(),
+                stop: stop.clone(),
+            });
+            std::thread::spawn(|| under_control_ler::host(8629, stop));
+        }
+    }
+
+    fn stop_hosting(&mut self) {
+        if let Screen::Host(host) = &self.screen {
+            host.stop();
             self.screen = Screen::Index(index::Index)
         }
     }

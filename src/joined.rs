@@ -21,4 +21,8 @@ impl Joined {
         let button = center(button("Leave").on_press(crate::Message::Joined(JoinedMessage::Leave)));
         center(column![title, button].height(150).spacing(20)).into()
     }
+
+    pub fn leave(&self) {
+        *self.stop.lock().unwrap() = true;
+    }
 }
