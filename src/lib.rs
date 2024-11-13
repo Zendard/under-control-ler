@@ -1,29 +1,7 @@
 use gilrs::{ev::AxisOrBtn, EventType, Gilrs};
-use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
-    str::FromStr,
-};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 #[cfg(target_os = "linux")]
 mod hosting;
-
-pub struct JoinConfig {
-    socket: SocketAddr,
-}
-
-impl JoinConfig {
-    fn new(args: &[String]) -> JoinConfig {
-        let ip_address = args.get(2).expect("Please enter an address");
-        let ip_address = IpAddr::from_str(ip_address).expect("Please enter a valid ipv4 or ipv6");
-
-        let default_port = "8629".to_string();
-        let port = args.get(3).unwrap_or(&default_port);
-        let port: u16 = port.parse().expect("Port number must be u16");
-
-        let socket = SocketAddr::new(ip_address, port);
-
-        JoinConfig { socket }
-    }
-}
 
 pub struct HostConfig {
     pub port: u16,
@@ -42,10 +20,8 @@ impl HostConfig {
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
-pub fn join(args: &[String]) {
-    let config = JoinConfig::new(args);
-
-    let socket = make_connection(&config);
+pub fn join(address: SocketAddr) {
+    let socket = make_connection(&address);
     send_controller_inputs(socket);
 }
 
@@ -59,13 +35,13 @@ pub fn host(args: &[String]) {
     crate::hosting::windows::host(args);
 }
 
-fn make_connection(join_config: &JoinConfig) -> UdpSocket {
+fn make_connection(address: &SocketAddr) -> UdpSocket {
     let socket = UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
         .expect("Failed to bind socket");
 
     socket
-        .connect(join_config.socket)
-        .unwrap_or_else(|error| panic!("Failed to connect to {}: {}", join_config.socket, error));
+        .connect(address)
+        .unwrap_or_else(|error| panic!("Failed to connect to {}: {}", address, error));
 
     socket.send(b"Joined").unwrap();
 

@@ -35,11 +35,11 @@ impl App {
     fn update(&mut self, message: Message) {
         match message {
             Message::Index(message) => match message {
-                index::IndexMessage::Join => self.screen = Screen::Join(join::Join),
+                index::IndexMessage::Join => self.screen = Screen::Join(join::Join::default()),
                 index::IndexMessage::Host => self.screen = Screen::Host,
             },
             Message::Join(message) => match message {
-                join::JoinMessage::Join => self.screen = Screen::Host,
+                join::JoinMessage::Join => self.join(),
                 _ => {
                     if let Screen::Join(state) = &mut self.screen {
                         state.update(message)
@@ -48,11 +48,19 @@ impl App {
             },
         }
     }
+
     fn view(&self) -> Element<Message> {
         match &self.screen {
-            Screen::Index(index) => index::Index::view(&index),
-            Screen::Join(join) => join::Join::view(&join),
+            Screen::Index(index) => index::Index::view(index),
+            Screen::Join(join) => join::Join::view(join),
             Screen::Host => todo!(),
+        }
+    }
+
+    fn join(&self) {
+        if let Screen::Join(join) = &self.screen {
+            let address = join.get_address().unwrap();
+            under_control_ler::join(address);
         }
     }
 }
