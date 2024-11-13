@@ -1,5 +1,8 @@
 use gilrs::{ev::AxisOrBtn, EventType, Gilrs};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
+    sync::{Arc, Mutex},
+};
 #[cfg(target_os = "linux")]
 mod hosting;
 
@@ -20,9 +23,9 @@ impl HostConfig {
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
-pub fn join(address: SocketAddr) {
+pub fn join(address: SocketAddr, stop: Arc<Mutex<bool>>) {
     let socket = make_connection(&address);
-    send_controller_inputs(socket);
+    send_controller_inputs(socket, stop);
 }
 
 #[cfg(target_os = "linux")]
@@ -48,9 +51,9 @@ fn make_connection(address: &SocketAddr) -> UdpSocket {
     socket
 }
 
-fn send_controller_inputs(socket: UdpSocket) {
-    let mut girls = Gilrs::new().unwrap();
-    let gamepad_names = girls
+fn send_controller_inputs(socket: UdpSocket, stop: Arc<Mutex<bool>>) {
+    let mut gilrs = Gilrs::new().unwrap();
+    let gamepad_names = gilrs
         .gamepads()
         .map(|gamepad| gamepad.1.name().to_string())
         .collect::<Vec<String>>();
@@ -61,9 +64,10 @@ fn send_controller_inputs(socket: UdpSocket) {
         &socket.peer_addr().unwrap()
     );
 
-    loop {
-        handle_controller_event(&mut girls, &socket)
+    while !*stop.lock().unwrap() {
+        handle_controller_event(&mut gilrs, &socket)
     }
+    println!("Left");
 }
 
 fn handle_controller_event(girls: &mut Gilrs, socket: &UdpSocket) {

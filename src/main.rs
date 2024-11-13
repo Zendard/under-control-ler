@@ -1,6 +1,9 @@
+use std::sync::{Arc, Mutex};
+
 use iced::Element;
 mod index;
 mod join;
+mod joined;
 
 fn main() -> iced::Result {
     iced::application("Under Control-ler", App::update, App::view)
@@ -17,11 +20,13 @@ struct App {
 enum Message {
     Index(index::IndexMessage),
     Join(join::JoinMessage),
+    Joined(joined::JoinedMessage),
 }
 
 enum Screen {
     Index(index::Index),
     Join(join::Join),
+    Joined(joined::Joined),
     Host,
 }
 
@@ -46,6 +51,9 @@ impl App {
                     }
                 }
             },
+            Message::Joined(message) => match message {
+                joined::JoinedMessage::Leave => self.leave(),
+            },
         }
     }
 
@@ -53,14 +61,28 @@ impl App {
         match &self.screen {
             Screen::Index(index) => index::Index::view(index),
             Screen::Join(join) => join::Join::view(join),
+            Screen::Joined(joined) => joined::Joined::view(joined),
             Screen::Host => todo!(),
         }
     }
 
-    fn join(&self) {
+    fn join(&mut self) {
         if let Screen::Join(join) = &self.screen {
             let address = join.get_address().unwrap();
-            under_control_ler::join(address);
+            let stop = Arc::new(Mutex::new(false));
+            let stop_thread = stop.clone();
+            let _ = std::thread::spawn(move || under_control_ler::join(address, stop_thread));
+            self.screen = Screen::Joined(joined::Joined {
+                ip: address.to_string(),
+                stop,
+            });
+        }
+    }
+
+    fn leave(&mut self) {
+        if let Screen::Joined(joined) = &self.screen {
+            *joined.stop.lock().unwrap() = true;
+            self.screen = Screen::Index(index::Index)
         }
     }
 }
