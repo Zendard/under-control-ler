@@ -1,7 +1,10 @@
-use crate::{hosting::RawMessage, SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE};
+use crate::{
+    hosting::{Client, RawMessage, VirtualGamepad},
+    SimpleEventType, JOYSTICK_RANGE, TRIGGER_RANGE,
+};
 use evdev::{
-    uinput::{VirtualDevice, VirtualDeviceBuilder},
-    AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent, InputId, Key, UinputAbsSetup,
+    uinput::VirtualDeviceBuilder, AbsInfo, AbsoluteAxisType, AttributeSet, BusType, InputEvent,
+    InputId, Key, UinputAbsSetup,
 };
 use std::{
     error::Error,
@@ -12,8 +15,6 @@ use std::{
 };
 
 use gilrs::{ev::AxisOrBtn, Axis, Button};
-
-struct VirtualGamepad(VirtualDevice);
 
 impl VirtualGamepad {
     fn new() -> Result<Self, Box<dyn Error>> {
@@ -90,12 +91,7 @@ impl VirtualGamepad {
     }
 }
 
-struct Client {
-    pub gamepad: Arc<Mutex<VirtualGamepad>>,
-    pub address: SocketAddr,
-}
-
-pub fn host(port: u16, stop: Arc<Mutex<bool>>) {
+pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
     let socket = open_port(port);
 
     let clients: Rc<Mutex<Vec<Client>>> = Rc::new(Mutex::new(Vec::new()));
@@ -110,7 +106,7 @@ pub fn host(port: u16, stop: Arc<Mutex<bool>>) {
                 length,
                 origin,
             };
-            let gamepad = find_or_create_client(message.origin, clients.clone());
+            let gamepad = find_or_create_client(message.origin, clients.clone(), &sender);
             if gamepad.is_none() {
                 continue;
             }
@@ -128,12 +124,14 @@ fn open_port(port: u16) -> UdpSocket {
 fn find_or_create_client(
     address: SocketAddr,
     clients: Rc<Mutex<Vec<Client>>>,
+    sender: &std::sync::mpsc::Sender<crate::Message>,
 ) -> Option<Arc<Mutex<VirtualGamepad>>> {
     let mut clients = clients.lock().unwrap();
     let client = clients.iter().find(|client| client.address == address);
 
     match client {
         None => {
+            sender.send(crate::Message::ClientJoined(address)).unwrap();
             let confirmation = dialoguer::Confirm::new()
                 .with_prompt(format!("Accept connection from {address}?"))
                 .interact()

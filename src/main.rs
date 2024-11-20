@@ -1,6 +1,5 @@
-use std::sync::{Arc, Mutex};
-
 use iced::Element;
+use std::sync::{Arc, Mutex};
 mod host;
 mod index;
 mod join;
@@ -18,7 +17,7 @@ struct App {
 }
 
 #[derive(Debug, Clone)]
-enum Message {
+pub enum Message {
     Index(index::IndexMessage),
     Join(join::JoinMessage),
     Joined(joined::JoinedMessage),
@@ -99,11 +98,13 @@ impl App {
     fn host(&mut self) {
         if let Screen::Index(_) = &self.screen {
             let stop = Arc::new(Mutex::new(false));
+            let (sender, receiver) = std::sync::mpsc::channel();
             self.screen = Screen::Host(host::Host {
                 clients: Vec::new(),
                 stop: stop.clone(),
+                receiver,
             });
-            std::thread::spawn(|| under_control_ler::host(8629, stop));
+            std::thread::spawn(|| under_control_ler::host(8629, stop, sender));
         }
     }
 

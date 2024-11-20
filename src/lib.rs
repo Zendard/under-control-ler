@@ -9,14 +9,19 @@ mod hosting;
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
+#[derive(Clone, Copy)]
+pub enum Message {
+    ClientJoined(SocketAddr),
+}
+
 pub fn join(address: SocketAddr, stop: Arc<Mutex<bool>>) {
     let socket = make_connection(&address);
     send_controller_inputs(socket, stop);
 }
 
 #[cfg(target_os = "linux")]
-pub fn host(port: u16, stop: Arc<Mutex<bool>>) {
-    crate::hosting::linux::host(port, stop);
+pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
+    crate::hosting::linux::host(port, stop, sender);
 }
 
 #[cfg(target_os = "windows")]
