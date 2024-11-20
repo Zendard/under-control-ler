@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use iced::{
-    widget::{center, column, text},
+    widget::{button, center, column, text},
     Element,
 };
 
@@ -23,7 +23,8 @@ pub enum HostMessage {
 impl Host {
     pub fn view(&self) -> Element<crate::Message> {
         let title = center(text("Under Control-ler").size(30));
-        center(column![title].height(150).spacing(20)).into()
+        let stop_button = button("Stop hosting").on_press(crate::Message::Host(HostMessage::Stop));
+        center(column![title, stop_button].height(150).spacing(20)).into()
     }
 
     pub fn update(&mut self, message: HostMessage) {}
