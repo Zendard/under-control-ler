@@ -1,4 +1,4 @@
-use iced::Element;
+use iced::{futures::Stream, Element, Subscription};
 use std::sync::{Arc, Mutex};
 mod host;
 mod index;
@@ -11,9 +11,18 @@ fn main() -> iced::Result {
         .run()
 }
 
-#[derive(Default)]
 struct App {
     screen: Screen,
+    receiver: std::sync::mpsc::Receiver<under_control_ler::Message>,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            screen: Screen::Index(index::Index),
+            receiver: std::sync::mpsc::channel().1,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -29,12 +38,6 @@ enum Screen {
     Join(join::Join),
     Joined(joined::Joined),
     Host(host::Host),
-}
-
-impl Default for Screen {
-    fn default() -> Self {
-        Screen::Index(index::Index)
-    }
 }
 
 impl App {
@@ -102,7 +105,6 @@ impl App {
             self.screen = Screen::Host(host::Host {
                 clients: Vec::new(),
                 stop: stop.clone(),
-                receiver,
             });
             std::thread::spawn(|| under_control_ler::host(8629, stop, sender));
         }

@@ -8,7 +8,6 @@ use iced::{
 pub struct Host {
     pub clients: Vec<Client>,
     pub stop: Arc<Mutex<bool>>,
-    pub receiver: std::sync::mpsc::Receiver<under_control_ler::Message>,
 }
 
 #[derive(Debug, Clone)]
