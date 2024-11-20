@@ -25,8 +25,8 @@ pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<c
 }
 
 #[cfg(target_os = "windows")]
-pub fn host(args: &[String]) {
-    crate::hosting::windows::host(args);
+pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
+    eprintln!("Hosting on windows not yet implemented");
 }
 
 fn make_connection(address: &SocketAddr) -> UdpSocket {

@@ -3,7 +3,6 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 
 pub mod linux;
-pub mod windows;
 
 #[derive(Debug)]
 struct RawMessage {
