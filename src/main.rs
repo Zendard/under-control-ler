@@ -1,5 +1,8 @@
-use iced::{futures::Stream, Element, Subscription};
-use std::sync::{Arc, Mutex};
+use iced::Element;
+use std::sync::{
+    mpsc::{Receiver, Sender},
+    Arc, Mutex,
+};
 mod host;
 mod index;
 mod join;
@@ -13,14 +16,17 @@ fn main() -> iced::Result {
 
 struct App {
     screen: Screen,
-    receiver: std::sync::mpsc::Receiver<under_control_ler::Message>,
+    receiver: Receiver<under_control_ler::Message>,
+    sender: Sender<under_control_ler::Message>,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let (sender, receiver) = std::sync::mpsc::channel();
         Self {
             screen: Screen::Index(index::Index),
-            receiver: std::sync::mpsc::channel().1,
+            receiver,
+            sender,
         }
     }
 }
@@ -102,11 +108,23 @@ impl App {
         if let Screen::Index(_) = &self.screen {
             let stop = Arc::new(Mutex::new(false));
             let (sender, receiver) = std::sync::mpsc::channel();
+            let (sender2, receiver2) = std::sync::mpsc::channel();
+            // self.receiver = receiver;
+            // self.sender = sender2;
             self.screen = Screen::Host(host::Host {
                 clients: Vec::new(),
                 stop: stop.clone(),
             });
-            std::thread::spawn(|| under_control_ler::host(8629, stop, sender));
+            std::thread::spawn(|| under_control_ler::host(8629, stop, sender, receiver2));
+            std::thread::spawn(move || loop {
+                let msg = receiver.recv().unwrap();
+                dbg!(&msg);
+                if let under_control_ler::Message::ClientJoined(address) = msg {
+                    sender2
+                        .send(under_control_ler::Message::ClientAccepted(address))
+                        .unwrap();
+                }
+            });
         }
     }
 

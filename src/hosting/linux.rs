@@ -10,7 +10,10 @@ use std::{
     error::Error,
     net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket},
     rc::Rc,
-    sync::{Arc, Mutex},
+    sync::{
+        mpsc::{Receiver, Sender},
+        Arc, Mutex,
+    },
     thread,
 };
 
@@ -91,7 +94,12 @@ impl VirtualGamepad {
     }
 }
 
-pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
+pub fn host(
+    port: u16,
+    stop: Arc<Mutex<bool>>,
+    sender: Sender<crate::Message>,
+    receiver: Receiver<crate::Message>,
+) {
     let socket = open_port(port);
 
     let clients: Rc<Mutex<Vec<Client>>> = Rc::new(Mutex::new(Vec::new()));
@@ -106,7 +114,8 @@ pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<c
                 length,
                 origin,
             };
-            let gamepad = find_or_create_client(message.origin, clients.clone(), &sender);
+            let gamepad =
+                find_or_create_client(message.origin, clients.clone(), &sender, &receiver);
             if gamepad.is_none() {
                 continue;
             }
@@ -124,32 +133,59 @@ fn open_port(port: u16) -> UdpSocket {
 fn find_or_create_client(
     address: SocketAddr,
     clients: Rc<Mutex<Vec<Client>>>,
-    sender: &std::sync::mpsc::Sender<crate::Message>,
+    sender: &Sender<crate::Message>,
+    receiver: &Receiver<crate::Message>,
 ) -> Option<Arc<Mutex<VirtualGamepad>>> {
-    let mut clients = clients.lock().unwrap();
+    let clients = clients.lock().unwrap();
     let client = clients.iter().find(|client| client.address == address);
 
     match client {
         None => {
-            sender.send(crate::Message::ClientJoined(address)).unwrap();
-            let confirmation = dialoguer::Confirm::new()
-                .with_prompt(format!("Accept connection from {address}?"))
-                .interact()
-                .unwrap();
-
-            if confirmation {
-                let gamepad = Arc::new(Mutex::new(VirtualGamepad::new().ok()?));
-                clients.push(Client {
-                    gamepad: gamepad.clone(),
-                    address,
-                });
-                Some(gamepad)
+            let accepted = handle_new_client(address, sender, receiver);
+            if accepted {
+                create_client(clients, address)
             } else {
                 None
             }
         }
         Some(client) => Some(client.gamepad.clone()),
     }
+}
+
+fn handle_new_client(
+    address: SocketAddr,
+    sender: &Sender<crate::Message>,
+    receiver: &Receiver<crate::Message>,
+) -> bool {
+    sender.send(crate::Message::ClientJoined(address)).unwrap();
+    loop {
+        let response = receiver.recv().unwrap();
+        match response {
+            crate::Message::ClientAccepted(client_address) => {
+                if client_address == address {
+                    return true;
+                }
+            }
+            crate::Message::ClientRejected(client_address) => {
+                if client_address == address {
+                    return false;
+                }
+            }
+            _ => (),
+        };
+    }
+}
+
+fn create_client(
+    mut clients: std::sync::MutexGuard<'_, Vec<Client>>,
+    address: SocketAddr,
+) -> Option<Arc<Mutex<VirtualGamepad>>> {
+    let gamepad = Arc::new(Mutex::new(VirtualGamepad::new().ok()?));
+    clients.push(Client {
+        gamepad: gamepad.clone(),
+        address,
+    });
+    Some(gamepad)
 }
 
 fn handle_receive(message: RawMessage, gamepad: Arc<Mutex<VirtualGamepad>>) {

@@ -1,7 +1,10 @@
 use gilrs::{ev::AxisOrBtn, EventType, Gilrs};
 use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket},
-    sync::{Arc, Mutex},
+    sync::{
+        mpsc::{Receiver, Sender},
+        Arc, Mutex,
+    },
 };
 #[cfg(target_os = "linux")]
 mod hosting;
@@ -9,9 +12,11 @@ mod hosting;
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Message {
     ClientJoined(SocketAddr),
+    ClientAccepted(SocketAddr),
+    ClientRejected(SocketAddr),
 }
 
 pub fn join(address: SocketAddr, stop: Arc<Mutex<bool>>) {
@@ -20,8 +25,13 @@ pub fn join(address: SocketAddr, stop: Arc<Mutex<bool>>) {
 }
 
 #[cfg(target_os = "linux")]
-pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
-    crate::hosting::linux::host(port, stop, sender);
+pub fn host(
+    port: u16,
+    stop: Arc<Mutex<bool>>,
+    sender: Sender<crate::Message>,
+    receiver: Receiver<crate::Message>,
+) {
+    crate::hosting::linux::host(port, stop, sender, receiver);
 }
 
 #[cfg(target_os = "windows")]
