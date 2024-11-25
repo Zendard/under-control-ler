@@ -109,22 +109,13 @@ impl App {
             let stop = Arc::new(Mutex::new(false));
             let (sender, receiver) = std::sync::mpsc::channel();
             let (sender2, receiver2) = std::sync::mpsc::channel();
-            // self.receiver = receiver;
-            // self.sender = sender2;
+            self.receiver = receiver;
+            self.sender = sender2;
             self.screen = Screen::Host(host::Host {
                 clients: Vec::new(),
                 stop: stop.clone(),
             });
             std::thread::spawn(|| under_control_ler::host(8629, stop, sender, receiver2));
-            std::thread::spawn(move || loop {
-                let msg = receiver.recv().unwrap();
-                dbg!(&msg);
-                if let under_control_ler::Message::ClientJoined(address) = msg {
-                    sender2
-                        .send(under_control_ler::Message::ClientAccepted(address))
-                        .unwrap();
-                }
-            });
         }
     }
 
