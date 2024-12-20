@@ -35,10 +35,14 @@ pub fn host(
 }
 
 #[cfg(target_os = "windows")]
-pub fn host(port: u16, stop: Arc<Mutex<bool>>, sender: std::sync::mpsc::Sender<crate::Message>) {
-    eprintln!("Hosting on windows not yet implemented");
+pub fn host(
+    port: u16,
+    stop: Arc<Mutex<bool>>,
+    sender: Sender<crate::Message>,
+    receiver: Receiver<crate::Message>,
+) {
+    eprintln!("Hosting only supported on linux for now...")
 }
-
 fn make_connection(address: &SocketAddr) -> UdpSocket {
     let socket = UdpSocket::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0))
         .expect("Failed to bind socket");

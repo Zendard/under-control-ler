@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 use iced::Element;
 use std::sync::{
     mpsc::{Receiver, Sender},
