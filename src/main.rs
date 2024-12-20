@@ -8,6 +8,8 @@ enum BackendMessage {
     Ready(mpsc::Sender<FrontendMessage>),
 }
 
+pub const DEFAULT_PORT: u16 = 8629;
+
 #[derive(Clone, Debug)]
 enum UIMessageClient {
     Servers,

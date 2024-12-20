@@ -1,6 +1,6 @@
 use crate::{BackendMessage, FrontendMessage, UIMessageClient, UIMessageServer};
 use iced::{
-    futures::{channel::mpsc, SinkExt, Stream, StreamExt},
+    futures::{channel::mpsc, executor::block_on, SinkExt, Stream, StreamExt},
     stream, Element, Subscription,
 };
 
@@ -52,7 +52,10 @@ impl State {
     pub fn update(&mut self, message: UIMessage) {
         match message {
             UIMessage::ChangeScreen(screen) => self.change_screen(screen),
-            UIMessage::Ready(sender) => self.sender = sender,
+            UIMessage::Ready(sender) => {
+                self.sender = sender;
+                println!("Ready");
+            }
             _ => (),
         }
     }
@@ -67,13 +70,13 @@ impl State {
         let mut sender = self.sender.clone();
         if screen == Screen::Host {
             self.mode = Mode::Server;
-            std::thread::spawn(|| async move {
-                sender.send(FrontendMessage::StartHosting).await.unwrap();
+            std::thread::spawn(move || {
+                block_on(sender.send(FrontendMessage::StartHosting)).unwrap();
             });
         } else if self.screen == Screen::Host && screen == Screen::Index {
             self.mode = Mode::None;
-            std::thread::spawn(|| async move {
-                sender.send(FrontendMessage::StopHosting).await.unwrap();
+            std::thread::spawn(move || {
+                block_on(sender.send(FrontendMessage::StopHosting)).unwrap();
             });
         }
         self.screen = screen
@@ -90,45 +93,55 @@ impl From<BackendMessage> for UIMessage {
             BackendMessage::Client(message) => UIMessage::Client(message),
             BackendMessage::Server(message) => UIMessage::Server(message),
             BackendMessage::Ready(sender) => UIMessage::Ready(sender),
-            _ => UIMessage::None,
         }
     }
 }
 
 fn subscription_worker() -> impl Stream<Item = BackendMessage> {
     stream::channel(100, |mut output| async move {
-        let (ui_sender, backend_receiver) = mpsc::channel::<FrontendMessage>(100);
-        let (backend_sender, ui_receiver) = mpsc::channel::<BackendMessage>(100);
+        loop {
+            // Create channels
+            let (ui_sender, backend_receiver) = mpsc::channel::<FrontendMessage>(100);
+            let (backend_sender, mut ui_receiver) = mpsc::channel::<BackendMessage>(100);
+            // Send ui_sender to frontend
+            output.send(BackendMessage::Ready(ui_sender)).await.unwrap();
 
-        output.send(BackendMessage::Ready(ui_sender)).await.unwrap();
+            let handle =
+                std::thread::spawn(move || frontend_to_backend(backend_receiver, backend_sender));
 
-        std::thread::spawn(move || frontend_to_backend(backend_receiver, backend_sender));
-        std::thread::spawn(move || backend_to_frontend(ui_receiver, output));
+            // Pass BackendMessage to subscription stream
+            loop {
+                let next_message = ui_receiver.select_next_some().await;
+                output.send(next_message).await.unwrap();
+                // Break when hosting is stopped because backend_receiver is dropped
+                if handle.is_finished() {
+                    break;
+                }
+            }
+        }
     })
 }
 
-async fn frontend_to_backend(
+fn frontend_to_backend(
     mut backend_receiver: mpsc::Receiver<FrontendMessage>,
     backend_sender: mpsc::Sender<BackendMessage>,
 ) {
     loop {
-        use iced::futures::StreamExt;
-        let next_message = backend_receiver.select_next_some().await;
-        match next_message {
+        let next_message = backend_receiver.try_next();
+        if next_message.is_err() {
+            continue;
+        }
+
+        match next_message.unwrap().unwrap() {
             FrontendMessage::StartHosting => {
-                crate::backend::hosting::host(backend_sender.clone(), backend_receiver)
+                crate::backend::hosting::host(
+                    crate::DEFAULT_PORT,
+                    backend_sender.clone(),
+                    backend_receiver,
+                );
+                break;
             }
             _ => (),
         }
-    }
-}
-
-async fn backend_to_frontend(
-    mut ui_receiver: mpsc::Receiver<BackendMessage>,
-    mut output: mpsc::Sender<BackendMessage>,
-) {
-    loop {
-        let next_message = ui_receiver.select_next_some().await;
-        output.send(next_message).await.unwrap();
     }
 }
