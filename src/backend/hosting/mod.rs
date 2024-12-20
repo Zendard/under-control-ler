@@ -1,7 +1,8 @@
 use crate::{BackendMessage, FrontendMessage};
 #[cfg(target_os = "linux")]
 use evdev::uinput::VirtualDevice;
-use iced::futures::executor::block_on;
+use iced::futures::executor::{block_on, ThreadPool};
+use iced::futures::SinkExt;
 use iced::futures::{channel::mpsc, StreamExt};
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
 use std::{
@@ -10,7 +11,6 @@ use std::{
 };
 
 mod linux;
-mod threadpool;
 
 #[derive(Debug)]
 struct RawMessage {
@@ -32,22 +32,41 @@ struct Client {
 
 pub fn host(
     port: u16,
-    sender: mpsc::Sender<BackendMessage>,
+    mut sender: mpsc::Sender<BackendMessage>,
     mut receiver: mpsc::Receiver<FrontendMessage>,
 ) {
     let accepted_clients: Vec<Client> = vec![];
-
     let socket = open_socket(port);
-
+    let mut recv_buffer = [0; 100];
+    let pool = ThreadPool::new();
     println!("Hosting...");
 
     loop {
-        let message = block_on(receiver.select_next_some());
-
-        dbg!(&message);
-
-        if message == FrontendMessage::StopHosting {
+        let ui_message = receiver.try_next();
+        if let Ok(Some(FrontendMessage::StopHosting)) = ui_message {
             break;
+        }
+
+        let received_data = socket.recv_from(&mut recv_buffer);
+        if received_data.is_err() {
+            dbg!(&received_data);
+            continue;
+        }
+        let (length, origin) = received_data.unwrap();
+
+        let accepted = accepted_clients
+            .iter()
+            .map(|client| client.address)
+            .find(|address| *address == origin)
+            .is_some();
+
+        if !accepted {
+            block_on(
+                sender.send(BackendMessage::Server(crate::UIMessageServer::JoinRequest(
+                    origin,
+                ))),
+            )
+            .unwrap();
         }
     }
     println!("Stopped hosting")

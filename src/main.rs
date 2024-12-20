@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use iced::futures::channel::mpsc;
 mod backend;
 mod ui;
@@ -17,7 +19,7 @@ enum UIMessageClient {
 
 #[derive(Clone, Debug)]
 enum UIMessageServer {
-    JoinRequest,
+    JoinRequest(SocketAddr),
     ClientLeft,
 }
 
