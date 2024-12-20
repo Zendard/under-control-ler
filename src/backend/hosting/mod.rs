@@ -47,7 +47,6 @@ pub fn host(
         dbg!(&message);
 
         if message == FrontendMessage::StopHosting {
-            dbg!("Stopping");
             break;
         }
     }

@@ -54,7 +54,6 @@ impl State {
             UIMessage::ChangeScreen(screen) => self.change_screen(screen),
             UIMessage::Ready(sender) => {
                 self.sender = sender;
-                println!("Ready");
             }
             _ => (),
         }
@@ -111,8 +110,10 @@ fn subscription_worker() -> impl Stream<Item = BackendMessage> {
 
             // Pass BackendMessage to subscription stream
             loop {
-                let next_message = ui_receiver.select_next_some().await;
-                output.send(next_message).await.unwrap();
+                let next_message = ui_receiver.next().await;
+                if let Some(next_message) = next_message {
+                    output.send(next_message).await.unwrap();
+                }
                 // Break when hosting is stopped because backend_receiver is dropped
                 if handle.is_finished() {
                     break;
