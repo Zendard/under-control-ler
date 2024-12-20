@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+};
 
 use iced::{
     widget::{button, center, column, scrollable, text, Column},
@@ -18,7 +21,7 @@ pub struct Client {
 #[derive(Clone, Debug)]
 pub enum HostMessage {
     Stop,
-    ClientJoined(Client),
+    ClientJoined(SocketAddr),
 }
 
 impl Host {
@@ -36,7 +39,9 @@ impl Host {
         center(column![title, clients, stop_button].height(150).spacing(20)).into()
     }
 
-    pub fn update(&mut self, _message: HostMessage) {}
+    pub fn update(&mut self, message: HostMessage) {
+        dbg!(message);
+    }
 
     pub fn stop(&self) {
         *self.stop.lock().unwrap() = true;
