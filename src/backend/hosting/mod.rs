@@ -54,11 +54,13 @@ pub fn host(
         }
         let (length, origin) = received_data.unwrap();
 
+        // Check if origin is already accepted
         let accepted = accepted_clients
             .iter()
             .map(|client| client.address)
             .any(|address| address == origin);
 
+        // If the origin is not accepted, send a JoinRequest to frontend
         if !accepted {
             block_on(
                 sender.send(BackendMessage::Server(crate::UIMessageServer::JoinRequest(
@@ -66,6 +68,7 @@ pub fn host(
                 ))),
             )
             .unwrap();
+            continue;
         }
     }
     println!("Stopped hosting")

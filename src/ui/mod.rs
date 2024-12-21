@@ -1,4 +1,5 @@
 use crate::{BackendMessage, FrontendMessage, UIMessageClient, UIMessageServer};
+use host::HostScreen;
 use iced::{
     futures::{channel::mpsc, executor::block_on, SinkExt, Stream, StreamExt},
     stream, Element, Subscription,
@@ -6,6 +7,11 @@ use iced::{
 
 mod host;
 mod index;
+
+pub trait ScreenTrait {
+    fn view(&self) -> Element<'static, UIMessage>;
+    fn update(&mut self, message: &UIMessage);
+}
 
 #[derive(Debug)]
 pub struct State {
@@ -16,7 +22,7 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         State {
-            screen: Screen::Index,
+            screen: Screen::default(),
             mode: Mode::None,
             sender: mpsc::channel(0).0,
         }
@@ -31,12 +37,32 @@ enum Mode {
     None,
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Screen {
-    #[default]
-    Index,
-    Host,
+    Index(index::IndexScreen),
+    Host(host::HostScreen),
     // Join,
+}
+
+impl Default for Screen {
+    fn default() -> Self {
+        Screen::Index(index::IndexScreen::default())
+    }
+}
+
+impl ScreenTrait for Screen {
+    fn view(&self) -> Element<'static, UIMessage> {
+        match self {
+            Self::Host(screen) => screen.view(),
+            Self::Index(screen) => screen.view(),
+        }
+    }
+    fn update(&mut self, message: &UIMessage) {
+        match self {
+            Self::Host(screen) => screen.update(message),
+            Self::Index(screen) => screen.update(message),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +75,7 @@ pub enum UIMessage {
 
 impl State {
     pub fn update(&mut self, message: UIMessage) {
+        self.screen.update(&message);
         match message {
             UIMessage::ChangeScreen(screen) => self.change_screen(screen),
             UIMessage::Ready(sender) => {
@@ -58,24 +85,26 @@ impl State {
         }
     }
     pub fn view(&self) -> Element<UIMessage> {
-        match self.screen {
-            Screen::Index => index::view(),
-            Screen::Host => host::view(),
-        }
+        self.screen.view()
     }
 
     fn change_screen(&mut self, screen: Screen) {
         let mut sender = self.sender.clone();
-        if screen == Screen::Host {
-            self.mode = Mode::Server;
-            std::thread::spawn(move || {
-                block_on(sender.send(FrontendMessage::StartHosting)).unwrap();
-            });
-        } else if self.screen == Screen::Host && screen == Screen::Index {
-            self.mode = Mode::None;
-            std::thread::spawn(move || {
-                block_on(sender.send(FrontendMessage::StopHosting)).unwrap();
-            });
+        match screen {
+            Screen::Host(_) => {
+                self.mode = Mode::Server;
+                std::thread::spawn(move || {
+                    block_on(sender.send(FrontendMessage::StartHosting)).unwrap();
+                });
+            }
+            Screen::Index(_) => {
+                if let Screen::Host(_) = self.screen {
+                    self.mode = Mode::None;
+                    std::thread::spawn(move || {
+                        block_on(sender.send(FrontendMessage::StopHosting)).unwrap();
+                    });
+                }
+            }
         }
         self.screen = screen
     }

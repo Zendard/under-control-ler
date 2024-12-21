@@ -20,7 +20,7 @@ enum UIMessageClient {
 #[derive(Clone, Debug)]
 enum UIMessageServer {
     JoinRequest(SocketAddr),
-    ClientLeft,
+    ClientLeft(SocketAddr),
 }
 
 #[derive(Debug, PartialEq)]
