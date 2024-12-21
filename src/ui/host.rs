@@ -13,9 +13,9 @@ impl ScreenTrait for HostScreen {
     fn view(&self) -> Element<'static, super::UIMessage> {
         let title = center(text("Hosting...").size(30));
         let log_text = center(text(self.log_text.join("\n")));
-        let stop_button = center(button("Stop Hosting").on_press(UIMessage::ChangeScreen(
-            Screen::Index(IndexScreen::default()),
-        )));
+        let stop_button = center(
+            button("Stop Hosting").on_press(UIMessage::ChangeScreen(Screen::Index(IndexScreen))),
+        );
         center(
             column![title, log_text, stop_button]
                 .height(150)

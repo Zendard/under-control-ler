@@ -46,7 +46,7 @@ pub enum Screen {
 
 impl Default for Screen {
     fn default() -> Self {
-        Screen::Index(index::IndexScreen::default())
+        Screen::Index(index::IndexScreen)
     }
 }
 
