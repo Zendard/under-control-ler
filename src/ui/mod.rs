@@ -45,7 +45,6 @@ pub enum UIMessage {
     Server(UIMessageServer),
     ChangeScreen(Screen),
     Ready(mpsc::Sender<FrontendMessage>),
-    None,
 }
 
 impl State {
@@ -133,16 +132,13 @@ fn frontend_to_backend(
             continue;
         }
 
-        match next_message.unwrap().unwrap() {
-            FrontendMessage::StartHosting => {
-                crate::backend::hosting::host(
-                    crate::DEFAULT_PORT,
-                    backend_sender.clone(),
-                    backend_receiver,
-                );
-                break;
-            }
-            _ => (),
+        if next_message.unwrap().unwrap() == FrontendMessage::StartHosting {
+            crate::backend::hosting::host(
+                crate::DEFAULT_PORT,
+                backend_sender.clone(),
+                backend_receiver,
+            );
+            break;
         }
     }
 }

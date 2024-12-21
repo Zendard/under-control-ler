@@ -57,8 +57,7 @@ pub fn host(
         let accepted = accepted_clients
             .iter()
             .map(|client| client.address)
-            .find(|address| *address == origin)
-            .is_some();
+            .any(|address| address == origin);
 
         if !accepted {
             block_on(
