@@ -10,6 +10,7 @@ enum BackendMessage {
     Ready(mpsc::Sender<FrontendMessage>),
 }
 
+// This port number is just random, i hope it isn't used too often
 pub const DEFAULT_PORT: u16 = 8629;
 
 #[derive(Clone, Debug)]

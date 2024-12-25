@@ -32,22 +32,31 @@ struct Client {
 
 pub fn host(
     port: u16,
-    mut sender: mpsc::Sender<BackendMessage>,
-    mut receiver: mpsc::Receiver<FrontendMessage>,
+    mut sender: mpsc::Sender<BackendMessage>, // Sender for ui events
+    mut receiver: mpsc::Receiver<FrontendMessage>, // Receiver for ui events
 ) {
+    // Start with no clients accepted
     let accepted_clients: Vec<Client> = vec![];
+    // Obtain a UDP socket
     let socket = open_socket(port);
     let mut recv_buffer = [0; 100];
+    // Initialize a ThreadPool for handling requests
     let pool = ThreadPool::new();
     println!("Hosting...");
 
     loop {
+        // Check for new ui messages
         let ui_message = receiver.try_next();
+
+        // Stop when receiving StopHosting message
         if let Ok(Some(FrontendMessage::StopHosting)) = ui_message {
             break;
         }
 
+        // Check for new network requests
         let received_data = socket.recv_from(&mut recv_buffer);
+
+        // Skip request handling when message is an error
         if received_data.is_err() {
             dbg!(&received_data);
             continue;

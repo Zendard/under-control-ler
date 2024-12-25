@@ -22,8 +22,10 @@ pub struct State {
 impl Default for State {
     fn default() -> Self {
         State {
-            screen: Screen::default(),
+            screen: Screen::Index(index::IndexScreen),
             mode: Mode::None,
+            // Initialize state with empty sender,
+            // this is replaced with actual sender when you start hosting/joining
             sender: mpsc::channel(0).0,
         }
     }
@@ -44,12 +46,7 @@ pub enum Screen {
     // Join,
 }
 
-impl Default for Screen {
-    fn default() -> Self {
-        Screen::Index(index::IndexScreen)
-    }
-}
-
+// Pass ScreenTrait method calls to types inside enum cases
 impl ScreenTrait for Screen {
     fn view(&self) -> Element<'static, UIMessage> {
         match self {
@@ -67,24 +64,30 @@ impl ScreenTrait for Screen {
 
 #[derive(Debug, Clone)]
 pub enum UIMessage {
+    // Message when you are a client (you joined someone)
     Client(UIMessageClient),
+    // Message when you are hosting
     Server(UIMessageServer),
+    // Message for changing screen
     ChangeScreen(Screen),
+    // Pass actual sender to state when hosting/joining
     Ready(mpsc::Sender<FrontendMessage>),
 }
 
 impl State {
     pub fn update(&mut self, message: UIMessage) {
-        self.screen.update(&message);
         match message {
             UIMessage::ChangeScreen(screen) => self.change_screen(screen),
+            // Set actual sender when hosting/joining
             UIMessage::Ready(sender) => {
                 self.sender = sender;
             }
-            _ => (),
+            // Pass message to screen logic
+            _ => self.screen.update(&message),
         }
     }
     pub fn view(&self) -> Element<UIMessage> {
+        // Let screen logic dictate UI
         self.screen.view()
     }
 
@@ -93,11 +96,13 @@ impl State {
         match screen {
             Screen::Host(_) => {
                 self.mode = Mode::Server;
+                // Send StartHosting message to backend when changing to host screen
                 std::thread::spawn(move || {
                     block_on(sender.send(FrontendMessage::StartHosting)).unwrap();
                 });
             }
             Screen::Index(_) => {
+                // Send StopHosting message to backend when changing to index from host screen
                 if let Screen::Host(_) = self.screen {
                     self.mode = Mode::None;
                     std::thread::spawn(move || {
@@ -106,10 +111,12 @@ impl State {
                 }
             }
         }
+        // Set state screen to screen from arguments
         self.screen = screen
     }
 }
 
+// Subscription which listens to BackendMessages and converts to UIMessages
 pub fn backend_subscription(state: &State) -> Subscription<UIMessage> {
     Subscription::run(subscription_worker).map(|backend_message| backend_message.into())
 }
@@ -156,17 +163,21 @@ fn frontend_to_backend(
     backend_sender: mpsc::Sender<BackendMessage>,
 ) {
     loop {
-        let next_message = backend_receiver.try_next();
-        if next_message.is_err() {
+        // Check for next BackendMessage
+        let message = backend_receiver.try_next();
+        // Skip handling when message is an error
+        if message.is_err() {
             continue;
         }
 
-        if next_message.unwrap().unwrap() == FrontendMessage::StartHosting {
+        if message.unwrap().unwrap() == FrontendMessage::StartHosting {
             crate::backend::hosting::host(
                 crate::DEFAULT_PORT,
                 backend_sender.clone(),
                 backend_receiver,
             );
+            // When hosting function is finished, we stopped hosting,
+            // so we break to later reinitialize the backend sender and receiver
             break;
         }
     }
