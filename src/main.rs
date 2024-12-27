@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use iced::futures::channel::mpsc;
 mod backend;
@@ -24,10 +24,12 @@ enum UIMessageServer {
     ClientLeft(SocketAddr),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum FrontendMessage {
     StartHosting,
     StopHosting,
+    Join(IpAddr),
+    Leave,
 }
 
 fn main() -> iced::Result {

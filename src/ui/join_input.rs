@@ -1,4 +1,4 @@
-use super::{host::HostScreen, Screen, ScreenTrait, UIMessage};
+use super::{host::HostScreen, join::JoinScreen, Screen, ScreenTrait, UIMessage};
 use iced::{
     widget::{button, center, column, text, text_input},
     Element,
@@ -6,7 +6,7 @@ use iced::{
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct JoinInputScreen {
-    ip: String,
+    pub ip: String,
 }
 
 impl ScreenTrait for JoinInputScreen {
@@ -17,7 +17,9 @@ impl ScreenTrait for JoinInputScreen {
                 .width(150)
                 .on_input(UIMessage::TextInput),
         );
-        let join_button = center(button("Join"));
+        let join_button = center(
+            button("Join").on_press(UIMessage::ChangeScreen(Screen::Join(JoinScreen::default()))),
+        );
         center(
             column![title, ip_input, join_button]
                 .height(150)

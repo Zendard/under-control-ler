@@ -1,3 +1,8 @@
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+};
+
 use crate::{BackendMessage, FrontendMessage, UIMessageClient, UIMessageServer};
 use host::HostScreen;
 use iced::{
@@ -7,6 +12,7 @@ use iced::{
 
 mod host;
 mod index;
+mod join;
 mod join_input;
 
 pub trait ScreenTrait {
@@ -45,6 +51,7 @@ pub enum Screen {
     Index(index::IndexScreen),
     Host(host::HostScreen),
     JoinInput(join_input::JoinInputScreen),
+    Join(join::JoinScreen),
 }
 
 // Pass ScreenTrait method calls to types inside enum cases
@@ -54,6 +61,7 @@ impl ScreenTrait for Screen {
             Self::Host(screen) => screen.view(),
             Self::Index(screen) => screen.view(),
             Self::JoinInput(screen) => screen.view(),
+            Self::Join(screen) => screen.view(),
         }
     }
     fn update(&mut self, message: &UIMessage) {
@@ -61,6 +69,7 @@ impl ScreenTrait for Screen {
             Self::Host(screen) => screen.update(message),
             Self::Index(screen) => screen.update(message),
             Self::JoinInput(screen) => screen.update(message),
+            Self::Join(screen) => screen.update(message),
         }
     }
 }
@@ -112,6 +121,24 @@ impl State {
                     self.mode = Mode::None;
                     std::thread::spawn(move || {
                         block_on(sender.send(FrontendMessage::StopHosting)).unwrap();
+                    });
+                }
+                // Send Leave message to backend when changing to index from join screen
+                else if let Screen::Join(_) = self.screen {
+                    self.mode = Mode::None;
+                    std::thread::spawn(move || {
+                        block_on(sender.send(FrontendMessage::Leave)).unwrap();
+                    });
+                }
+            }
+            Screen::Join(_) => {
+                if let Screen::JoinInput(join_input_state) = &self.screen {
+                    let address =
+                        IpAddr::from_str(&join_input_state.ip).expect("Failed to parse ip address");
+                    self.mode = Mode::Client;
+                    // Send Join message to backend when changing from JoinInput to Host screen
+                    std::thread::spawn(move || {
+                        block_on(sender.send(FrontendMessage::Join(address))).unwrap();
                     });
                 }
             }
@@ -175,14 +202,25 @@ fn frontend_to_backend(
         if message.is_err() {
             continue;
         }
-
-        if message.unwrap().unwrap() == FrontendMessage::StartHosting {
+        let message = message.unwrap().unwrap();
+        if message == FrontendMessage::StartHosting {
             crate::backend::hosting::host(
                 crate::DEFAULT_PORT,
                 backend_sender.clone(),
                 backend_receiver,
             );
-            // When hosting function is finished, we stopped hosting,
+            // When host function is finished, we stopped hosting,
+            // so we break to later reinitialize the backend sender and receiver
+            break;
+        }
+
+        if let FrontendMessage::Join(ip) = message.clone() {
+            crate::backend::join::join(
+                SocketAddr::new(ip, crate::DEFAULT_PORT),
+                backend_sender.clone(),
+                backend_receiver,
+            );
+            // When join function is finished, we left,
             // so we break to later reinitialize the backend sender and receiver
             break;
         }
