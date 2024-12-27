@@ -7,13 +7,21 @@ pub mod hosting;
 pub mod join;
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
-const NETWORK_BUFFER_SIZE: usize = 1;
+const NETWORK_BUFFER_SIZE: usize = 2;
 
+#[derive(Debug)]
 pub struct NetworkMessageSocket(UdpSocket);
 
 #[derive(Debug)]
+pub struct NetworkMessageSender {
+    socket: NetworkMessageSocket,
+    destination: SocketAddr,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum NetworkMessage {
     Ping,
+    Pong,
 }
 
 impl NetworkMessageSocket {
@@ -23,12 +31,17 @@ impl NetworkMessageSocket {
         let message = recv_buf.try_into().ok()?;
         Some((message, origin))
     }
+
+    pub fn try_clone(&self) -> std::io::Result<Self> {
+        Ok(Self(self.0.try_clone()?))
+    }
 }
 
 impl Into<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn into(self) -> [u8; NETWORK_BUFFER_SIZE] {
         match self {
-            NetworkMessage::Ping => [0],
+            NetworkMessage::Ping => [0, 0],
+            NetworkMessage::Pong => [0, 1],
         }
     }
 }
@@ -36,9 +49,19 @@ impl TryFrom<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     type Error = &'static str;
     fn try_from(buffer: [u8; NETWORK_BUFFER_SIZE]) -> Result<Self, Self::Error> {
         match buffer {
-            [0] => Ok(Self::Ping),
+            [0, 0] => Ok(Self::Ping),
+            [0, 1] => Ok(Self::Pong),
             _ => Err("Failed to parse NetworkMessage"),
         }
+    }
+}
+
+type EasyResult<T> = Result<T, Box<dyn std::error::Error>>;
+impl NetworkMessageSender {
+    fn send_network_message(&self, message: NetworkMessage) -> EasyResult<()> {
+        let message: [u8; NETWORK_BUFFER_SIZE] = message.into();
+        self.socket.0.send_to(&message, self.destination)?;
+        Ok(())
     }
 }
 

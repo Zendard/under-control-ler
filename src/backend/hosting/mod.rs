@@ -1,11 +1,13 @@
-use super::open_socket;
+use super::{open_socket, NetworkMessageSender, NetworkMessageSocket};
+use crate::backend::NetworkMessage;
 use crate::{BackendMessage, FrontendMessage};
 #[cfg(target_os = "linux")]
 use evdev::uinput::VirtualDevice;
-use iced::futures::executor::{block_on, ThreadPool};
+use iced::futures::executor::block_on;
 use iced::futures::SinkExt;
 use iced::futures::{channel::mpsc, StreamExt};
 use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
+use std::time::Duration;
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -41,7 +43,7 @@ pub fn host(
     // Obtain a UDP socket
     let socket = open_socket(port);
     // Initialize a ThreadPool for handling requests
-    let pool = ThreadPool::new().unwrap();
+    let pool = threadpool::ThreadPool::new(10);
     println!("Hosting...");
 
     loop {
@@ -63,13 +65,25 @@ pub fn host(
         }
 
         let (message, origin) = received_data.unwrap();
-        dbg!(message);
+        dbg!(&message);
 
         // Check if origin is already accepted
         let accepted = accepted_clients
             .iter()
             .map(|client| client.address)
             .any(|address| address == origin);
+
+        // Origin doesn't need to be accepted to ping
+        if let NetworkMessage::Ping = message {
+            let socket_clone = socket.try_clone().unwrap();
+            pool.execute(move || {
+                let sender = NetworkMessageSender {
+                    socket: socket_clone,
+                    destination: origin,
+                };
+                sender.send_network_message(NetworkMessage::Pong).unwrap();
+            });
+        }
 
         // If the origin is not accepted, send a JoinRequest to frontend
         if !accepted {

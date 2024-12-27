@@ -1,12 +1,8 @@
-use super::{NetworkMessage, NetworkMessageSocket};
-use crate::{backend::open_socket, BackendMessage, FrontendMessage};
+use super::{open_socket, NetworkMessage, NetworkMessageSender};
+use crate::{BackendMessage, FrontendMessage};
+use core::net;
 use iced::futures::channel::mpsc::{Receiver, Sender};
-use std::net::{SocketAddr, UdpSocket};
-
-struct NetworkMessageSender {
-    socket: NetworkMessageSocket,
-    destination: SocketAddr,
-}
+use std::{net::SocketAddr, time::Duration};
 
 pub fn join(
     socket_addr: SocketAddr,
@@ -22,13 +18,30 @@ pub fn join(
     network_sender
         .send_network_message(NetworkMessage::Ping)
         .expect("Failed to send message");
+    ping(network_sender, socket_addr);
 }
 
-type EasyResult<T> = Result<T, Box<dyn std::error::Error>>;
-impl NetworkMessageSender {
-    fn send_network_message(&self, message: NetworkMessage) -> EasyResult<()> {
-        let message: [u8; 1] = message.into();
-        self.socket.0.send_to(&message, self.destination)?;
-        Ok(())
+fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr) {
+    let now = std::time::Instant::now();
+    let mut message = NetworkMessage::Ping;
+    while message != NetworkMessage::Pong && now.elapsed() < Duration::from_secs(5) {
+        let received_data = socket.socket.next_message();
+
+        if received_data == None {
+            continue;
+        }
+        let received_data = received_data.unwrap();
+
+        dbg!(&received_data);
+
+        let received_message = received_data.0;
+        let received_origin = received_data.1;
+
+        dbg!(&socket_addr);
+
+        if received_origin == socket_addr {
+            message = received_message
+        }
     }
+    dbg!(now.elapsed());
 }
