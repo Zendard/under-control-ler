@@ -15,7 +15,9 @@ pub const DEFAULT_PORT: u16 = 8629;
 
 #[derive(Clone, Debug)]
 enum UIMessageClient {
-    Servers,
+    Accepted,
+    Rejected,
+    Ping(f32),
 }
 
 #[derive(Clone, Debug)]
@@ -28,6 +30,7 @@ enum UIMessageServer {
 enum FrontendMessage {
     StartHosting,
     StopHosting,
+    AcceptClient(SocketAddr),
     Join(IpAddr),
     Leave,
 }
