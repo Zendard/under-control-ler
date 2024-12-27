@@ -19,13 +19,16 @@ pub fn join(
         destination: socket_addr,
     };
     println!("Joining {}", socket_addr);
+    ping(network_sender.try_clone().unwrap(), socket_addr, sender);
     network_sender
-        .send_network_message(NetworkMessage::Ping)
-        .expect("Failed to send message");
-    ping(network_sender, socket_addr, sender);
+        .send_network_message(NetworkMessage::JoinRequest)
+        .unwrap();
 }
 
 fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sender<BackendMessage>) {
+    socket
+        .send_network_message(NetworkMessage::Ping)
+        .expect("Failed to send message");
     let now = std::time::Instant::now();
     // Some random NetworkMessage variant which isn't Ping
     let mut message = NetworkMessage::ClientAccepted;

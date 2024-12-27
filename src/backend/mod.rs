@@ -22,6 +22,7 @@ pub struct NetworkMessageSender {
 pub enum NetworkMessage {
     Ping,
     ClientAccepted,
+    JoinRequest,
 }
 
 impl NetworkMessageSocket {
@@ -41,7 +42,8 @@ impl Into<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn into(self) -> [u8; NETWORK_BUFFER_SIZE] {
         match self {
             NetworkMessage::Ping => [0, 0],
-            NetworkMessage::ClientAccepted => [1, 0],
+            NetworkMessage::JoinRequest => [1, 0],
+            NetworkMessage::ClientAccepted => [1, 1],
         }
     }
 }
@@ -50,7 +52,8 @@ impl TryFrom<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn try_from(buffer: [u8; NETWORK_BUFFER_SIZE]) -> Result<Self, Self::Error> {
         match buffer {
             [0, 0] => Ok(Self::Ping),
-            [1, 0] => Ok(Self::ClientAccepted),
+            [1, 0] => Ok(Self::JoinRequest),
+            [1, 1] => Ok(Self::ClientAccepted),
             _ => Err("Failed to parse NetworkMessage"),
         }
     }
@@ -62,6 +65,13 @@ impl NetworkMessageSender {
         let message: [u8; NETWORK_BUFFER_SIZE] = message.into();
         self.socket.0.send_to(&message, self.destination)?;
         Ok(())
+    }
+
+    fn try_clone(&self) -> std::io::Result<Self> {
+        Ok(NetworkMessageSender {
+            socket: self.socket.try_clone()?,
+            destination: self.destination.clone(),
+        })
     }
 }
 

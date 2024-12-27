@@ -32,6 +32,7 @@ enum FrontendMessage {
     StopHosting,
     AcceptClient(SocketAddr),
     Join(IpAddr),
+    ChangeScreen(crate::ui::Screen),
     Leave,
 }
 

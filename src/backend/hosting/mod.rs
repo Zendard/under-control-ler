@@ -39,7 +39,7 @@ pub fn host(
     mut receiver: mpsc::Receiver<FrontendMessage>, // Receiver for ui events
 ) {
     // Start with no clients accepted
-    let accepted_clients: Vec<Client> = vec![];
+    let mut accepted_clients: Vec<Client> = vec![];
     // Obtain a UDP socket
     let socket = open_socket(port);
     // Initialize a ThreadPool for handling requests
@@ -51,8 +51,12 @@ pub fn host(
         let ui_message = receiver.try_next();
 
         // Stop when receiving StopHosting message
-        if let Ok(Some(FrontendMessage::StopHosting)) = ui_message {
-            break;
+        match ui_message {
+            Ok(Some(FrontendMessage::StopHosting)) => break,
+            Ok(Some(FrontendMessage::AcceptClient(origin))) => {
+                accept_client(&mut accepted_clients, origin)
+            }
+            _ => (),
         }
 
         // Check for new network requests
@@ -66,12 +70,6 @@ pub fn host(
 
         let (message, origin) = received_data.unwrap();
         dbg!(&message);
-
-        // Check if origin is already accepted
-        let accepted = accepted_clients
-            .iter()
-            .map(|client| client.address)
-            .any(|address| address == origin);
 
         // Origin doesn't need to be accepted to ping
         if let NetworkMessage::Ping = message {
@@ -87,6 +85,12 @@ pub fn host(
             continue;
         }
 
+        // Check if origin is already accepted
+        let accepted = accepted_clients
+            .iter()
+            .map(|client| client.address)
+            .any(|address| address == origin);
+
         // If the origin is not accepted, send a JoinRequest to frontend and skip further handling
         if !accepted {
             block_on(
@@ -99,4 +103,13 @@ pub fn host(
         }
     }
     println!("Stopped hosting")
+}
+
+fn accept_client(accepted_clients: &mut Vec<Client>, address: SocketAddr) {
+    let client = Client {
+        gamepad: Arc::new(Mutex::new(VirtualGamepad())),
+        address,
+    };
+
+    accepted_clients.push(client);
 }

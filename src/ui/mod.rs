@@ -86,19 +86,25 @@ pub enum UIMessage {
     TextInput(String),
     // Pass actual sender to state when hosting/joining
     Ready(mpsc::Sender<FrontendMessage>),
+    // Message for sending a FrontendMessage
+    ToBackend(FrontendMessage),
 }
 
 impl State {
     pub fn update(&mut self, message: UIMessage) {
         match message {
-            UIMessage::ChangeScreen(screen) => self.change_screen(screen),
+            UIMessage::ChangeScreen(ref screen) => self.change_screen(screen.clone()),
             // Set actual sender when hosting/joining
-            UIMessage::Ready(sender) => {
-                self.sender = sender;
+            UIMessage::Ready(ref sender) => {
+                self.sender = sender.clone();
             }
-            // Pass message to screen logic
-            _ => self.screen.update(&message),
+            UIMessage::ToBackend(ref message) => {
+                block_on(self.sender.send(message.clone())).unwrap()
+            }
+            _ => (),
         }
+        // Pass message to screen logic
+        self.screen.update(&message)
     }
     pub fn view(&self) -> Element<UIMessage> {
         // Let screen logic dictate UI
