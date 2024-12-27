@@ -1,7 +1,11 @@
 use super::{open_socket, NetworkMessage, NetworkMessageSender};
 use crate::{BackendMessage, FrontendMessage};
 use core::net;
-use iced::futures::channel::mpsc::{Receiver, Sender};
+use iced::futures::{
+    channel::mpsc::{Receiver, Sender},
+    executor::block_on,
+    SinkExt,
+};
 use std::{net::SocketAddr, time::Duration};
 
 pub fn join(
@@ -18,10 +22,10 @@ pub fn join(
     network_sender
         .send_network_message(NetworkMessage::Ping)
         .expect("Failed to send message");
-    ping(network_sender, socket_addr);
+    ping(network_sender, socket_addr, sender);
 }
 
-fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr) {
+fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sender<BackendMessage>) {
     let now = std::time::Instant::now();
     // Some random NetworkMessage variant which isn't Ping
     let mut message = NetworkMessage::ClientAccepted;
@@ -39,5 +43,11 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr) {
             message = received_message
         }
     }
-    dbg!(now.elapsed());
+    let ping_ms = now.elapsed().as_nanos() as f32 / 1_000_000 as f32;
+    block_on(
+        sender.send(BackendMessage::Client(crate::UIMessageClient::Ping(
+            ping_ms,
+        ))),
+    )
+    .unwrap();
 }
