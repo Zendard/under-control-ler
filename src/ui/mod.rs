@@ -7,6 +7,7 @@ use iced::{
 
 mod host;
 mod index;
+mod join_input;
 
 pub trait ScreenTrait {
     fn view(&self) -> Element<'static, UIMessage>;
@@ -43,7 +44,7 @@ enum Mode {
 pub enum Screen {
     Index(index::IndexScreen),
     Host(host::HostScreen),
-    // Join,
+    JoinInput(join_input::JoinInputScreen),
 }
 
 // Pass ScreenTrait method calls to types inside enum cases
@@ -52,12 +53,14 @@ impl ScreenTrait for Screen {
         match self {
             Self::Host(screen) => screen.view(),
             Self::Index(screen) => screen.view(),
+            Self::JoinInput(screen) => screen.view(),
         }
     }
     fn update(&mut self, message: &UIMessage) {
         match self {
             Self::Host(screen) => screen.update(message),
             Self::Index(screen) => screen.update(message),
+            Self::JoinInput(screen) => screen.update(message),
         }
     }
 }
@@ -70,6 +73,8 @@ pub enum UIMessage {
     Server(UIMessageServer),
     // Message for changing screen
     ChangeScreen(Screen),
+    // Message for updating text input
+    TextInput(String),
     // Pass actual sender to state when hosting/joining
     Ready(mpsc::Sender<FrontendMessage>),
 }
@@ -110,6 +115,7 @@ impl State {
                     });
                 }
             }
+            _ => (),
         }
         // Set state screen to screen from arguments
         self.screen = screen
@@ -117,7 +123,7 @@ impl State {
 }
 
 // Subscription which listens to BackendMessages and converts to UIMessages
-pub fn backend_subscription(state: &State) -> Subscription<UIMessage> {
+pub fn backend_subscription(_state: &State) -> Subscription<UIMessage> {
     Subscription::run(subscription_worker).map(|backend_message| backend_message.into())
 }
 

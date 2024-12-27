@@ -1,4 +1,4 @@
-use super::{host::HostScreen, Screen, ScreenTrait, UIMessage};
+use super::{host::HostScreen, join_input::JoinInputScreen, Screen, ScreenTrait, UIMessage};
 use iced::{
     widget::{button, center, column, text},
     Element,
@@ -10,7 +10,9 @@ pub struct IndexScreen;
 impl ScreenTrait for IndexScreen {
     fn view(&self) -> Element<'static, super::UIMessage> {
         let title = center(text("Under Control-ler").size(30));
-        let join_button = center(button("Join"));
+        let join_button = center(button("Join").on_press(UIMessage::ChangeScreen(
+            Screen::JoinInput(JoinInputScreen::default()),
+        )));
         let host_button = center(
             button("Host").on_press(UIMessage::ChangeScreen(Screen::Host(HostScreen::default()))),
         );
