@@ -1,3 +1,4 @@
+use super::open_socket;
 use crate::{BackendMessage, FrontendMessage};
 #[cfg(target_os = "linux")]
 use evdev::uinput::VirtualDevice;
@@ -39,9 +40,8 @@ pub fn host(
     let accepted_clients: Vec<Client> = vec![];
     // Obtain a UDP socket
     let socket = open_socket(port);
-    let mut recv_buffer = [0; 100];
     // Initialize a ThreadPool for handling requests
-    let pool = ThreadPool::new();
+    let pool = ThreadPool::new().unwrap();
     println!("Hosting...");
 
     loop {
@@ -54,14 +54,16 @@ pub fn host(
         }
 
         // Check for new network requests
-        let received_data = socket.recv_from(&mut recv_buffer);
+        let received_data = socket.next_message();
 
         // Skip request handling when message is an error
-        if received_data.is_err() {
+        if received_data.is_none() {
             dbg!(&received_data);
             continue;
         }
-        let (length, origin) = received_data.unwrap();
+
+        let (message, origin) = received_data.unwrap();
+        dbg!(message);
 
         // Check if origin is already accepted
         let accepted = accepted_clients
@@ -81,9 +83,4 @@ pub fn host(
         }
     }
     println!("Stopped hosting")
-}
-
-fn open_socket(port: u16) -> UdpSocket {
-    UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), port))
-        .expect("Failed to bind to port")
 }
