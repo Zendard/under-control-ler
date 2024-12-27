@@ -81,11 +81,13 @@ pub fn host(
                     socket: socket_clone,
                     destination: origin,
                 };
-                sender.send_network_message(NetworkMessage::Pong).unwrap();
+                sender.send_network_message(NetworkMessage::Ping).unwrap();
             });
+            // We don't want to send a join request when just pinging
+            continue;
         }
 
-        // If the origin is not accepted, send a JoinRequest to frontend
+        // If the origin is not accepted, send a JoinRequest to frontend and skip further handling
         if !accepted {
             block_on(
                 sender.send(BackendMessage::Server(crate::UIMessageServer::JoinRequest(

@@ -21,7 +21,7 @@ pub struct NetworkMessageSender {
 #[derive(Debug, PartialEq)]
 pub enum NetworkMessage {
     Ping,
-    Pong,
+    ClientAccepted,
 }
 
 impl NetworkMessageSocket {
@@ -41,7 +41,7 @@ impl Into<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn into(self) -> [u8; NETWORK_BUFFER_SIZE] {
         match self {
             NetworkMessage::Ping => [0, 0],
-            NetworkMessage::Pong => [0, 1],
+            NetworkMessage::ClientAccepted => [1, 0],
         }
     }
 }
@@ -50,7 +50,7 @@ impl TryFrom<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn try_from(buffer: [u8; NETWORK_BUFFER_SIZE]) -> Result<Self, Self::Error> {
         match buffer {
             [0, 0] => Ok(Self::Ping),
-            [0, 1] => Ok(Self::Pong),
+            [1, 0] => Ok(Self::ClientAccepted),
             _ => Err("Failed to parse NetworkMessage"),
         }
     }

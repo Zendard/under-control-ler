@@ -23,22 +23,18 @@ pub fn join(
 
 fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr) {
     let now = std::time::Instant::now();
-    let mut message = NetworkMessage::Ping;
-    while message != NetworkMessage::Pong && now.elapsed() < Duration::from_secs(5) {
+    // Some random NetworkMessage variant which isn't Ping
+    let mut message = NetworkMessage::ClientAccepted;
+    // Keep waiting for Ping with a 5 second timeout
+    while message != NetworkMessage::Ping && now.elapsed() < Duration::from_secs(5) {
         let received_data = socket.socket.next_message();
 
         if received_data == None {
             continue;
         }
-        let received_data = received_data.unwrap();
+        let (received_message, received_origin) = received_data.unwrap();
 
-        dbg!(&received_data);
-
-        let received_message = received_data.0;
-        let received_origin = received_data.1;
-
-        dbg!(&socket_addr);
-
+        // Only accept ping when from the same origin
         if received_origin == socket_addr {
             message = received_message
         }
