@@ -4,14 +4,45 @@ use iced::futures::channel::mpsc;
 mod backend;
 mod ui;
 
+// This port number is just random, i hope it isn't used too often
+pub const DEFAULT_PORT: u16 = 8629;
+
+#[derive(Debug, PartialEq)]
+pub enum GamepadInput {
+    Button(ButtonInput, bool),
+    Axis(AxisInput, i8),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ButtonInput {
+    A,
+    B,
+    X,
+    Y,
+    DpadUp,
+    DpadDown,
+    DpadLeft,
+    DpadRight,
+    BumperLeft,
+    BumperRight,
+    StickLeft,
+    StickRight,
+}
+#[derive(Debug, PartialEq)]
+pub enum AxisInput {
+    StickLeftX,
+    StickLeftY,
+    StickRightX,
+    StickRightY,
+    TriggerLeft,
+    TriggerRight,
+}
+
 enum BackendMessage {
     Client(UIMessageClient),
     Server(UIMessageServer),
     Ready(mpsc::Sender<FrontendMessage>),
 }
-
-// This port number is just random, i hope it isn't used too often
-pub const DEFAULT_PORT: u16 = 8629;
 
 #[derive(Clone, Debug)]
 enum UIMessageClient {

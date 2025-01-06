@@ -1,13 +1,11 @@
-use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket},
-    string::ParseError,
-};
+use crate::{ButtonInput, GamepadInput};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 
 pub mod hosting;
 pub mod join;
 const JOYSTICK_RANGE: isize = 32768;
 const TRIGGER_RANGE: isize = 1023;
-const NETWORK_BUFFER_SIZE: usize = 2;
+const NETWORK_BUFFER_SIZE: usize = 4;
 
 #[derive(Debug)]
 pub struct NetworkMessageSocket(UdpSocket);
@@ -23,6 +21,7 @@ pub enum NetworkMessage {
     Ping,
     ClientAccepted,
     JoinRequest,
+    Input(GamepadInput),
 }
 
 impl NetworkMessageSocket {
@@ -41,20 +40,62 @@ impl NetworkMessageSocket {
 impl Into<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     fn into(self) -> [u8; NETWORK_BUFFER_SIZE] {
         match self {
-            NetworkMessage::Ping => [0, 0],
-            NetworkMessage::JoinRequest => [1, 0],
-            NetworkMessage::ClientAccepted => [1, 1],
+            NetworkMessage::Ping => [0, 0, 0, 0],
+            NetworkMessage::JoinRequest => [1, 0, 0, 0],
+            NetworkMessage::ClientAccepted => [1, 1, 0, 0],
+            NetworkMessage::Input(gamepad_input) => gamepad_input.encode(),
         }
     }
 }
+
+impl GamepadInput {
+    pub fn encode(self) -> [u8; NETWORK_BUFFER_SIZE] {
+        match self {
+            GamepadInput::Button(button_type, pressed) => [2, 0, button_type as u8, pressed.into()],
+            GamepadInput::Axis(axis_type, axis_value) => [
+                2,
+                1,
+                axis_type as u8,
+                // Convert signed i8 from axis value into unsigned u8 by adding 128
+                (axis_value as i16 + 128).try_into().unwrap(),
+            ],
+        }
+    }
+}
+
 impl TryFrom<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
     type Error = &'static str;
     fn try_from(buffer: [u8; NETWORK_BUFFER_SIZE]) -> Result<Self, Self::Error> {
         match buffer {
-            [0, 0] => Ok(Self::Ping),
-            [1, 0] => Ok(Self::JoinRequest),
-            [1, 1] => Ok(Self::ClientAccepted),
+            [0, 0, 0, 0] => Ok(Self::Ping),
+            [1, 0, 0, 0] => Ok(Self::JoinRequest),
+            [1, 1, 0, 0] => Ok(Self::ClientAccepted),
+            [2, 0, button_type, pressed] => Ok(Self::Input(GamepadInput::Button(
+                button_type.try_into().unwrap(),
+                pressed == 1,
+            ))),
             _ => Err("Failed to parse NetworkMessage"),
+        }
+    }
+}
+
+impl TryFrom<u8> for ButtonInput {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::A),
+            1 => Ok(Self::B),
+            2 => Ok(Self::X),
+            3 => Ok(Self::Y),
+            4 => Ok(Self::DpadUp),
+            5 => Ok(Self::DpadDown),
+            6 => Ok(Self::DpadLeft),
+            7 => Ok(Self::DpadRight),
+            8 => Ok(Self::BumperLeft),
+            9 => Ok(Self::BumperRight),
+            10 => Ok(Self::StickLeft),
+            11 => Ok(Self::StickRight),
+            _ => Err("Failed to parse ButtonInput"),
         }
     }
 }

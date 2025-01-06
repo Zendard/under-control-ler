@@ -1,13 +1,11 @@
-use super::{open_socket, NetworkMessageSender, NetworkMessageSocket};
+#[cfg(target_os = "linux")]
+use self::linux::VirtualGamepad;
+use super::{open_socket, NetworkMessageSender};
 use crate::backend::NetworkMessage;
 use crate::{BackendMessage, FrontendMessage};
-#[cfg(target_os = "linux")]
-use evdev::uinput::VirtualDevice;
+use iced::futures::channel::mpsc;
 use iced::futures::executor::block_on;
 use iced::futures::SinkExt;
-use iced::futures::{channel::mpsc, StreamExt};
-use std::net::{Ipv4Addr, SocketAddrV4, UdpSocket};
-use std::time::Duration;
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -21,12 +19,6 @@ struct RawMessage {
     length: usize,
     origin: SocketAddr,
 }
-
-#[cfg(target_os = "linux")]
-pub struct VirtualGamepad(VirtualDevice);
-
-#[cfg(target_os = "windows")]
-pub struct VirtualGamepad();
 
 struct Client {
     pub gamepad: Arc<Mutex<VirtualGamepad>>,
@@ -71,7 +63,7 @@ pub fn host(
         let (message, origin) = received_data.unwrap();
         dbg!(&message);
 
-        // Origin doesn't need to be accepted to ping
+        // Origin doesn't need to be accepted to ping, so we run it before checking
         if let NetworkMessage::Ping = message {
             let socket_clone = socket.try_clone().unwrap();
             pool.execute(move || {
@@ -106,8 +98,9 @@ pub fn host(
 }
 
 fn accept_client(accepted_clients: &mut Vec<Client>, address: SocketAddr) {
+    let gamepad = VirtualGamepad::new().expect("Failed to create virtual gamepad");
     let client = Client {
-        gamepad: Arc::new(Mutex::new(VirtualGamepad())),
+        gamepad: Arc::new(Mutex::new(gamepad)),
         address,
     };
 
