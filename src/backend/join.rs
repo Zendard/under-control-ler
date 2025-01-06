@@ -1,5 +1,6 @@
 use super::{open_socket, NetworkMessage, NetworkMessageSender};
 use crate::{BackendMessage, FrontendMessage};
+use gilrs::{Event, Gilrs};
 use iced::futures::{
     channel::mpsc::{Receiver, Sender},
     executor::block_on,
@@ -39,6 +40,13 @@ pub fn join(
         }
     }
     println!("We were accepted");
+
+    let mut gilrs = Gilrs::new().unwrap();
+    loop {
+        while let Some(Event { id: _, event, .. }) = gilrs.next_event() {
+            dbg!(&event);
+        }
+    }
 }
 
 fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sender<BackendMessage>) {
