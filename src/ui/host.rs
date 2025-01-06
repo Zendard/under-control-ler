@@ -27,7 +27,7 @@ impl ScreenTrait for HostScreen {
         let stop_button = center(
             button("Stop Hosting").on_press(UIMessage::ChangeScreen(Screen::Index(IndexScreen))),
         );
-        let mut content = column![];
+        let content;
         if let Some(_) = self.current_requesting_client {
             content = column![title, accept_button.unwrap(), log_text, stop_button];
         } else {

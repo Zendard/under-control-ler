@@ -27,6 +27,7 @@ pub fn join(
     loop {
         // Check for new network requests
         let received_data = network_sender.socket.next_message();
+        dbg!(&received_data);
 
         // Only continue when received data is not an error and a ClientAccepted message
         if let Some((NetworkMessage::ClientAccepted, origin)) = received_data {
