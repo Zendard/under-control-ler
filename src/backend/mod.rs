@@ -3,8 +3,8 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 
 pub mod hosting;
 pub mod join;
-const JOYSTICK_RANGE: isize = 32768;
-const TRIGGER_RANGE: isize = 1023;
+const JOYSTICK_RANGE: i32 = 32768;
+const TRIGGER_RANGE: i32 = 1023;
 const NETWORK_BUFFER_SIZE: usize = 4;
 
 #[derive(Debug)]

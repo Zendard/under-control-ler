@@ -43,8 +43,11 @@ pub fn join(
 
     let mut gilrs = Gilrs::new().unwrap();
     loop {
-        while let Some(Event { id: _, event, .. }) = gilrs.next_event() {
-            dbg!(&event);
+        while let Some(Event { id, event, .. }) = gilrs.next_event() {
+            // Skip handling when vendor id is our own
+            if gilrs.gamepad(id).vendor_id() == Some(8629) {
+                continue;
+            }
 
             // Only send input when we can convert it to a GamepadInput
             if let Some(event) = GamepadInput::from_event(event) {
@@ -89,10 +92,10 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
 impl GamepadInput {
     fn from_event(event: gilrs::EventType) -> Option<Self> {
         match event {
-            gilrs::EventType::AxisChanged(axis, value, _) => Self::convert_axis(axis, value),
             gilrs::EventType::ButtonChanged(button, value, _) => {
                 Self::convert_button(button, value)
             }
+            gilrs::EventType::AxisChanged(axis, value, _) => Self::convert_axis(axis, value),
             _ => None,
         }
     }
@@ -109,11 +112,26 @@ impl GamepadInput {
         };
         // Axis values range from -1 to 1, so we multiply by 127 to maximise the i8 range
         let value = value * 127.0;
-        dbg!(&value);
         Some(GamepadInput::Axis(axis, value.round() as i8))
     }
 
     fn convert_button(button: Button, value: f32) -> Option<Self> {
+        // Triggers are treated as buttons by gilrs, we treat them as axis
+        if let Button::LeftTrigger2 = button {
+            let value = value * 127.0;
+            return Some(GamepadInput::Axis(
+                AxisInput::TriggerLeft,
+                value.round() as i8,
+            ));
+        };
+        // Same with right trigger
+        if let Button::RightTrigger2 = button {
+            let value = value * 127.0;
+            return Some(GamepadInput::Axis(
+                AxisInput::TriggerRight,
+                value.round() as i8,
+            ));
+        };
         let button = match button {
             Button::South => ButtonInput::A,
             Button::East => ButtonInput::B,
@@ -123,8 +141,8 @@ impl GamepadInput {
             Button::DPadDown => ButtonInput::DpadDown,
             Button::DPadLeft => ButtonInput::DpadLeft,
             Button::DPadRight => ButtonInput::DpadRight,
-            Button::LeftTrigger2 => ButtonInput::BumperLeft,
-            Button::RightTrigger2 => ButtonInput::BumperRight,
+            Button::LeftTrigger => ButtonInput::BumperLeft,
+            Button::RightTrigger => ButtonInput::BumperRight,
             Button::LeftThumb => ButtonInput::StickLeft,
             Button::RightThumb => ButtonInput::StickRight,
             Button::Select => ButtonInput::Select,

@@ -92,6 +92,20 @@ pub fn host(
                 .unwrap();
                 continue;
             }
+
+            // Play input when receiving input, after acceptation check
+            if let NetworkMessage::Input(input) = message {
+                accepted_clients
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|client| client.address == origin)
+                    .unwrap()
+                    .gamepad
+                    .lock()
+                    .unwrap()
+                    .play_input(input);
+            }
         }
     });
 
