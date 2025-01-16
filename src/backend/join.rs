@@ -107,6 +107,9 @@ impl GamepadInput {
             Axis::RightZ => AxisInput::TriggerRight,
             _ => return None,
         };
+        // Axis values range from -1 to 1, so we multiply by 127 to maximise the i8 range
+        let value = value * 127.0;
+        dbg!(&value);
         Some(GamepadInput::Axis(axis, value.round() as i8))
     }
 
