@@ -27,6 +27,8 @@ pub enum ButtonInput {
     BumperRight,
     StickLeft,
     StickRight,
+    Select,
+    Start,
 }
 #[derive(Debug, PartialEq)]
 pub enum AxisInput {

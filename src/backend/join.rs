@@ -1,6 +1,6 @@
 use super::{open_socket, NetworkMessage, NetworkMessageSender};
-use crate::{BackendMessage, FrontendMessage};
-use gilrs::{Event, Gilrs};
+use crate::{AxisInput, BackendMessage, ButtonInput, FrontendMessage, GamepadInput};
+use gilrs::{Axis, Button, Event, Gilrs};
 use iced::futures::{
     channel::mpsc::{Receiver, Sender},
     executor::block_on,
@@ -45,6 +45,13 @@ pub fn join(
     loop {
         while let Some(Event { id: _, event, .. }) = gilrs.next_event() {
             dbg!(&event);
+
+            // Only send input when we can convert it to a GamepadInput
+            if let Some(event) = GamepadInput::from_event(event) {
+                network_sender
+                    .send_network_message(NetworkMessage::Input(event))
+                    .unwrap();
+            }
         }
     }
 }
@@ -77,4 +84,50 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
         ))),
     )
     .unwrap();
+}
+
+impl GamepadInput {
+    fn from_event(event: gilrs::EventType) -> Option<Self> {
+        match event {
+            gilrs::EventType::AxisChanged(axis, value, _) => Self::convert_axis(axis, value),
+            gilrs::EventType::ButtonChanged(button, value, _) => {
+                Self::convert_button(button, value)
+            }
+            _ => None,
+        }
+    }
+
+    fn convert_axis(axis: Axis, value: f32) -> Option<Self> {
+        let axis = match axis {
+            Axis::LeftStickX => AxisInput::StickLeftX,
+            Axis::LeftStickY => AxisInput::StickLeftY,
+            Axis::RightStickX => AxisInput::StickRightX,
+            Axis::RightStickY => AxisInput::StickRightY,
+            Axis::LeftZ => AxisInput::TriggerLeft,
+            Axis::RightZ => AxisInput::TriggerRight,
+            _ => return None,
+        };
+        Some(GamepadInput::Axis(axis, value.round() as i8))
+    }
+
+    fn convert_button(button: Button, value: f32) -> Option<Self> {
+        let button = match button {
+            Button::South => ButtonInput::A,
+            Button::East => ButtonInput::B,
+            Button::West => ButtonInput::X,
+            Button::North => ButtonInput::Y,
+            Button::DPadUp => ButtonInput::DpadUp,
+            Button::DPadDown => ButtonInput::DpadDown,
+            Button::DPadLeft => ButtonInput::DpadLeft,
+            Button::DPadRight => ButtonInput::DpadRight,
+            Button::LeftTrigger2 => ButtonInput::BumperLeft,
+            Button::RightTrigger2 => ButtonInput::BumperRight,
+            Button::LeftThumb => ButtonInput::StickLeft,
+            Button::RightThumb => ButtonInput::StickRight,
+            Button::Select => ButtonInput::Select,
+            Button::Start => ButtonInput::Start,
+            _ => return None,
+        };
+        Some(GamepadInput::Button(button, value == 1.0))
+    }
 }

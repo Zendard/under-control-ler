@@ -28,6 +28,7 @@ impl NetworkMessageSocket {
     pub fn next_message(&self) -> Option<(NetworkMessage, SocketAddr)> {
         let mut recv_buf = [0; NETWORK_BUFFER_SIZE];
         let origin = self.0.recv_from(&mut recv_buf).ok()?.1;
+        dbg!(&recv_buf);
         let message = recv_buf.try_into().ok()?;
         Some((message, origin))
     }
