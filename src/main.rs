@@ -49,7 +49,6 @@ enum BackendMessage {
 #[derive(Clone, Debug)]
 enum UIMessageClient {
     Accepted,
-    Rejected,
     Ping(f32),
 }
 

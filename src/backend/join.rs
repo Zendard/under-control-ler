@@ -4,14 +4,14 @@ use gilrs::{Axis, Button, Event, Gilrs};
 use iced::futures::{
     channel::mpsc::{Receiver, Sender},
     executor::block_on,
-    SinkExt,
+    SinkExt, StreamExt,
 };
 use std::{net::SocketAddr, time::Duration};
 
 pub fn join(
     socket_addr: SocketAddr,
-    sender: Sender<BackendMessage>,
-    receiver: Receiver<FrontendMessage>,
+    mut sender: Sender<BackendMessage>,
+    mut receiver: Receiver<FrontendMessage>,
 ) {
     let network_sender = NetworkMessageSender {
         // Add 1 to port so you can join and host on the same machine for testing
@@ -19,10 +19,20 @@ pub fn join(
         destination: socket_addr,
     };
     println!("Joining {}", socket_addr);
-    ping(network_sender.try_clone().unwrap(), socket_addr, sender);
+    ping(
+        network_sender.try_clone().unwrap(),
+        socket_addr,
+        sender.clone(),
+    );
     network_sender
         .send_network_message(NetworkMessage::JoinRequest)
         .unwrap();
+
+    // Check for new ui messages
+    std::thread::spawn(move || loop {
+        let ui_message = block_on(receiver.select_next_some());
+        dbg!(&ui_message);
+    });
 
     // Wait until we are accepted
     loop {
@@ -39,9 +49,14 @@ pub fn join(
             }
         }
     }
+    // Send accepted message to frontend
+    block_on(sender.send(BackendMessage::Client(crate::UIMessageClient::Accepted))).unwrap();
     println!("We were accepted");
 
     let mut gilrs = Gilrs::new().unwrap();
+    let mut now = std::time::Instant::now();
+
+    // Listen for inputs
     loop {
         while let Some(Event { id, event, .. }) = gilrs.next_event() {
             // Skip handling when vendor id is our own
@@ -54,6 +69,15 @@ pub fn join(
                 network_sender
                     .send_network_message(NetworkMessage::Input(event))
                     .unwrap();
+            }
+            if now.elapsed() >= std::time::Duration::new(1, 0) {
+                println!("pinging");
+                ping(
+                    network_sender.try_clone().unwrap(),
+                    socket_addr,
+                    sender.clone(),
+                );
+                now = std::time::Instant::now();
             }
         }
     }
@@ -70,7 +94,7 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
     while message != NetworkMessage::Ping && now.elapsed() < Duration::from_secs(5) {
         let received_data = socket.socket.next_message();
 
-        if received_data == None {
+        if received_data.is_none() {
             continue;
         }
         let (received_message, received_origin) = received_data.unwrap();
@@ -80,7 +104,7 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
             message = received_message
         }
     }
-    let ping_ms = now.elapsed().as_nanos() as f32 / 1_000_000 as f32;
+    let ping_ms = now.elapsed().as_nanos() as f32 / 1_000_000_f32;
     block_on(
         sender.send(BackendMessage::Client(crate::UIMessageClient::Ping(
             ping_ms,

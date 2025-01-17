@@ -30,7 +30,6 @@ impl ScreenTrait for JoinScreen {
             let log_text = match message {
                 UIMessageClient::Ping(delay) => format!("Ping: {delay}"),
                 UIMessageClient::Accepted => "You were accepted by the host".to_string(),
-                UIMessageClient::Rejected => "You were rejected by the host".to_string(),
             };
             self.log_text.push(log_text);
         }
