@@ -1,4 +1,4 @@
-use super::{host::HostScreen, join::JoinScreen, Screen, ScreenTrait, UIMessage};
+use super::{join::JoinScreen, Screen, ScreenTrait, UIMessage};
 use iced::{
     widget::{button, center, column, text, text_input},
     Element,

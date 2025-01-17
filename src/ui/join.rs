@@ -1,6 +1,6 @@
 use crate::UIMessageClient;
 
-use super::{index::IndexScreen, Screen, ScreenTrait, UIMessage, UIMessageServer};
+use super::{index::IndexScreen, Screen, ScreenTrait, UIMessage};
 use iced::{
     widget::{button, center, column, text},
     Element,

@@ -8,7 +8,6 @@ use crate::{BackendMessage, FrontendMessage};
 use iced::futures::channel::mpsc;
 use iced::futures::executor::block_on;
 use iced::futures::{SinkExt, StreamExt};
-use std::net::UdpSocket;
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
