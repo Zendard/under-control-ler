@@ -71,7 +71,6 @@ pub fn join(
                     .unwrap();
             }
             if now.elapsed() >= std::time::Duration::new(1, 0) {
-                println!("pinging");
                 ping(
                     network_sender.try_clone().unwrap(),
                     socket_addr,
