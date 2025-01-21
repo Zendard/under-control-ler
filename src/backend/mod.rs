@@ -1,10 +1,10 @@
-use crate::{ButtonInput, GamepadInput};
+use crate::{AxisInput, ButtonInput, GamepadInput};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, UdpSocket};
 
 pub mod hosting;
 pub mod join;
-const JOYSTICK_RANGE: isize = 32768;
-const TRIGGER_RANGE: isize = 1023;
+const JOYSTICK_RANGE: i32 = 32768;
+const TRIGGER_RANGE: i32 = 1023;
 const NETWORK_BUFFER_SIZE: usize = 4;
 
 #[derive(Debug)]
@@ -57,6 +57,7 @@ impl GamepadInput {
                 1,
                 axis_type as u8,
                 // Convert signed i8 from axis value into unsigned u8 by adding 128
+                // We have to avoid overflows so we first convert to i16
                 (axis_value as i16 + 128).try_into().unwrap(),
             ],
         }
@@ -73,6 +74,12 @@ impl TryFrom<[u8; NETWORK_BUFFER_SIZE]> for NetworkMessage {
             [2, 0, button_type, pressed] => Ok(Self::Input(GamepadInput::Button(
                 button_type.try_into().unwrap(),
                 pressed == 1,
+            ))),
+            [2, 1, axis_type, value] => Ok(Self::Input(GamepadInput::Axis(
+                axis_type.try_into().unwrap(),
+                // Convert unsigned u8 from network to signed i8 by subtracting 128
+                // We have to avoid overflows so we first convert to i16
+                (value as i16 - 128) as i8,
             ))),
             _ => Err("Failed to parse NetworkMessage"),
         }
@@ -95,6 +102,23 @@ impl TryFrom<u8> for ButtonInput {
             9 => Ok(Self::BumperRight),
             10 => Ok(Self::StickLeft),
             11 => Ok(Self::StickRight),
+            12 => Ok(Self::Select),
+            13 => Ok(Self::Start),
+            _ => Err("Failed to parse ButtonInput"),
+        }
+    }
+}
+
+impl TryFrom<u8> for AxisInput {
+    type Error = &'static str;
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(AxisInput::StickLeftX),
+            1 => Ok(AxisInput::StickLeftY),
+            2 => Ok(AxisInput::StickRightX),
+            3 => Ok(AxisInput::StickRightY),
+            4 => Ok(AxisInput::TriggerLeft),
+            5 => Ok(AxisInput::TriggerRight),
             _ => Err("Failed to parse ButtonInput"),
         }
     }

@@ -8,14 +8,13 @@ use crate::{BackendMessage, FrontendMessage};
 use iced::futures::channel::mpsc;
 use iced::futures::executor::block_on;
 use iced::futures::{SinkExt, StreamExt};
-use std::net::UdpSocket;
 use std::{
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
 
+#[cfg(target_os = "linux")]
 mod linux;
-mod windows;
 
 #[derive(Debug)]
 struct RawMessage {
@@ -94,6 +93,20 @@ pub fn host(
                 )
                 .unwrap();
                 continue;
+            }
+
+            // Play input when receiving input, after acceptation check
+            if let NetworkMessage::Input(input) = message {
+                accepted_clients
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .find(|client| client.address == origin)
+                    .unwrap()
+                    .gamepad
+                    .lock()
+                    .unwrap()
+                    .play_input(input);
             }
         }
     });

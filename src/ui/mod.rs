@@ -4,7 +4,6 @@ use std::{
 };
 
 use crate::{BackendMessage, FrontendMessage, UIMessageClient, UIMessageServer};
-use host::HostScreen;
 use iced::{
     futures::{channel::mpsc, executor::block_on, SinkExt, Stream, StreamExt},
     stream, Element, Subscription,

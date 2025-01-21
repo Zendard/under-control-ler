@@ -1,17 +1,17 @@
 use super::{open_socket, NetworkMessage, NetworkMessageSender};
-use crate::{BackendMessage, FrontendMessage};
-use gilrs::{Event, Gilrs};
+use crate::{AxisInput, BackendMessage, ButtonInput, FrontendMessage, GamepadInput};
+use gilrs::{Axis, Button, Event, Gilrs};
 use iced::futures::{
     channel::mpsc::{Receiver, Sender},
     executor::block_on,
-    SinkExt,
+    SinkExt, StreamExt,
 };
 use std::{net::SocketAddr, time::Duration};
 
 pub fn join(
     socket_addr: SocketAddr,
-    sender: Sender<BackendMessage>,
-    receiver: Receiver<FrontendMessage>,
+    mut sender: Sender<BackendMessage>,
+    mut receiver: Receiver<FrontendMessage>,
 ) {
     let network_sender = NetworkMessageSender {
         // Add 1 to port so you can join and host on the same machine for testing
@@ -19,10 +19,20 @@ pub fn join(
         destination: socket_addr,
     };
     println!("Joining {}", socket_addr);
-    ping(network_sender.try_clone().unwrap(), socket_addr, sender);
+    ping(
+        network_sender.try_clone().unwrap(),
+        socket_addr,
+        sender.clone(),
+    );
     network_sender
         .send_network_message(NetworkMessage::JoinRequest)
         .unwrap();
+
+    // Check for new ui messages
+    std::thread::spawn(move || loop {
+        let ui_message = block_on(receiver.select_next_some());
+        dbg!(&ui_message);
+    });
 
     // Wait until we are accepted
     loop {
@@ -39,12 +49,35 @@ pub fn join(
             }
         }
     }
+    // Send accepted message to frontend
+    block_on(sender.send(BackendMessage::Client(crate::UIMessageClient::Accepted))).unwrap();
     println!("We were accepted");
 
     let mut gilrs = Gilrs::new().unwrap();
+    let mut now = std::time::Instant::now();
+
+    // Listen for inputs
     loop {
-        while let Some(Event { id: _, event, .. }) = gilrs.next_event() {
-            dbg!(&event);
+        while let Some(Event { id, event, .. }) = gilrs.next_event() {
+            // Skip handling when vendor id is our own
+            if gilrs.gamepad(id).vendor_id() == Some(8629) {
+                continue;
+            }
+
+            // Only send input when we can convert it to a GamepadInput
+            if let Some(event) = GamepadInput::from_event(event) {
+                network_sender
+                    .send_network_message(NetworkMessage::Input(event))
+                    .unwrap();
+            }
+            if now.elapsed() >= std::time::Duration::new(1, 0) {
+                ping(
+                    network_sender.try_clone().unwrap(),
+                    socket_addr,
+                    sender.clone(),
+                );
+                now = std::time::Instant::now();
+            }
         }
     }
 }
@@ -60,7 +93,7 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
     while message != NetworkMessage::Ping && now.elapsed() < Duration::from_secs(5) {
         let received_data = socket.socket.next_message();
 
-        if received_data == None {
+        if received_data.is_none() {
             continue;
         }
         let (received_message, received_origin) = received_data.unwrap();
@@ -70,11 +103,75 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
             message = received_message
         }
     }
-    let ping_ms = now.elapsed().as_nanos() as f32 / 1_000_000 as f32;
+    let ping_ms = now.elapsed().as_nanos() as f32 / 1_000_000_f32;
     block_on(
         sender.send(BackendMessage::Client(crate::UIMessageClient::Ping(
             ping_ms,
         ))),
     )
     .unwrap();
+}
+
+impl GamepadInput {
+    fn from_event(event: gilrs::EventType) -> Option<Self> {
+        match event {
+            gilrs::EventType::ButtonChanged(button, value, _) => {
+                Self::convert_button(button, value)
+            }
+            gilrs::EventType::AxisChanged(axis, value, _) => Self::convert_axis(axis, value),
+            _ => None,
+        }
+    }
+
+    fn convert_axis(axis: Axis, value: f32) -> Option<Self> {
+        let axis = match axis {
+            Axis::LeftStickX => AxisInput::StickLeftX,
+            Axis::LeftStickY => AxisInput::StickLeftY,
+            Axis::RightStickX => AxisInput::StickRightX,
+            Axis::RightStickY => AxisInput::StickRightY,
+            Axis::LeftZ => AxisInput::TriggerLeft,
+            Axis::RightZ => AxisInput::TriggerRight,
+            _ => return None,
+        };
+        // Axis values range from -1 to 1, so we multiply by 127 to maximise the i8 range
+        let value = value * 127.0;
+        Some(GamepadInput::Axis(axis, value.round() as i8))
+    }
+
+    fn convert_button(button: Button, value: f32) -> Option<Self> {
+        // Triggers are treated as buttons by gilrs, we treat them as axis
+        if let Button::LeftTrigger2 = button {
+            let value = value * 127.0;
+            return Some(GamepadInput::Axis(
+                AxisInput::TriggerLeft,
+                value.round() as i8,
+            ));
+        };
+        // Same with right trigger
+        if let Button::RightTrigger2 = button {
+            let value = value * 127.0;
+            return Some(GamepadInput::Axis(
+                AxisInput::TriggerRight,
+                value.round() as i8,
+            ));
+        };
+        let button = match button {
+            Button::South => ButtonInput::A,
+            Button::East => ButtonInput::B,
+            Button::West => ButtonInput::X,
+            Button::North => ButtonInput::Y,
+            Button::DPadUp => ButtonInput::DpadUp,
+            Button::DPadDown => ButtonInput::DpadDown,
+            Button::DPadLeft => ButtonInput::DpadLeft,
+            Button::DPadRight => ButtonInput::DpadRight,
+            Button::LeftTrigger => ButtonInput::BumperLeft,
+            Button::RightTrigger => ButtonInput::BumperRight,
+            Button::LeftThumb => ButtonInput::StickLeft,
+            Button::RightThumb => ButtonInput::StickRight,
+            Button::Select => ButtonInput::Select,
+            Button::Start => ButtonInput::Start,
+            _ => return None,
+        };
+        Some(GamepadInput::Button(button, value == 1.0))
+    }
 }

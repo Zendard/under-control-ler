@@ -27,6 +27,8 @@ pub enum ButtonInput {
     BumperRight,
     StickLeft,
     StickRight,
+    Select,
+    Start,
 }
 #[derive(Debug, PartialEq)]
 pub enum AxisInput {
@@ -47,7 +49,6 @@ enum BackendMessage {
 #[derive(Clone, Debug)]
 enum UIMessageClient {
     Accepted,
-    Rejected,
     Ping(f32),
 }
 

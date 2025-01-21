@@ -1,8 +1,8 @@
 use crate::UIMessageClient;
 
-use super::{index::IndexScreen, Screen, ScreenTrait, UIMessage, UIMessageServer};
+use super::{index::IndexScreen, Screen, ScreenTrait, UIMessage};
 use iced::{
-    widget::{button, center, column, text},
+    widget::{button, center, column, scrollable, text, Column},
     Element,
 };
 
@@ -14,12 +14,18 @@ pub struct JoinScreen {
 impl ScreenTrait for JoinScreen {
     fn view(&self) -> Element<'static, super::UIMessage> {
         let title = center(text("Joining...").size(30));
-        let log_text = center(text(self.log_text.join("\n")));
+        let log_text = center(scrollable(Column::from_vec(
+            self.log_text
+                .iter()
+                .map(|log_message| text(log_message.clone()).into())
+                .collect(),
+        )))
+        .height(100);
         let leave_button =
             center(button("Leave").on_press(UIMessage::ChangeScreen(Screen::Index(IndexScreen))));
         center(
             column![title, log_text, leave_button]
-                .height(150)
+                .height(650)
                 .spacing(20),
         )
         .into()
@@ -30,7 +36,6 @@ impl ScreenTrait for JoinScreen {
             let log_text = match message {
                 UIMessageClient::Ping(delay) => format!("Ping: {delay}"),
                 UIMessageClient::Accepted => "You were accepted by the host".to_string(),
-                UIMessageClient::Rejected => "You were rejected by the host".to_string(),
             };
             self.log_text.push(log_text);
         }
