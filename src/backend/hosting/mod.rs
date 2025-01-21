@@ -1,5 +1,7 @@
 #[cfg(target_os = "linux")]
 use self::linux::VirtualGamepad;
+#[cfg(target_os = "windows")]
+use self::windows::VirtualGamepad;
 use super::{open_socket, NetworkMessageSender, NetworkMessageSocket};
 use crate::backend::NetworkMessage;
 use crate::{BackendMessage, FrontendMessage};
@@ -13,6 +15,7 @@ use std::{
 };
 
 mod linux;
+mod windows;
 
 #[derive(Debug)]
 struct RawMessage {
