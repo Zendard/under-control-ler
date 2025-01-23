@@ -26,6 +26,14 @@ impl VirtualGamepad {
         }
     }
     fn change_button(&mut self, button: ButtonInput, pressed: bool) {
+        if !pressed {
+            let button = GamepadButtons::None;
+            let injected_input = InjectedInputGamepadInfo::new().unwrap();
+            injected_input.SetButtons(button).ok();
+            self.0.InjectGamepadInput(&injected_input).unwrap();
+            return;
+        }
+
         let button = match button {
             ButtonInput::A => GamepadButtons::A,
             ButtonInput::B => GamepadButtons::B,
@@ -39,8 +47,8 @@ impl VirtualGamepad {
             ButtonInput::BumperRight => GamepadButtons::RightShoulder,
             ButtonInput::StickLeft => GamepadButtons::LeftThumbstick,
             ButtonInput::StickRight => GamepadButtons::RightThumbstick,
-            ButtonInput::Select => GamepadButtons::Menu,
-            ButtonInput::Start => GamepadButtons::View,
+            ButtonInput::Select => GamepadButtons::View,
+            ButtonInput::Start => GamepadButtons::Menu,
         };
         let injected_input = InjectedInputGamepadInfo::new().unwrap();
         injected_input.SetButtons(button).ok();
