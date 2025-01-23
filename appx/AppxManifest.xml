@@ -2,30 +2,30 @@
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  IgnorableNamespaces="uap"
-  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="rescap">
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
   <Identity
-    Name="Zendard.UnderController.UnderController"
+    Name="under-control-ler"
     Publisher="CN=Zendard"
     Version="1.1.0.0" />
   <Properties>
-    <DisplayName>Under Control(ler)</DisplayName>
+    <DisplayName>Under Controller</DisplayName>
     <PublisherDisplayName>Zendard</PublisherDisplayName>
     <Logo>StoreLogo.png</Logo>
   </Properties>
   <Resources>
     <Resource Language="en-us" />
   </Resources>
-  <Applications>
-    <Application Id="App" Executable="under_control_ler.exe" EntryPoint="CoreApp.App">
-      <uap:VisualElements DisplayName="Under Control(ler)" Description="A small utility to share controller inputs peer-to-peer"
-        Square150x150Logo="Square150x150Logo.png" Square44x44Logo="Square44x44Logo.png" BackgroundColor="transparent">
-        <uap:SplashScreen Image="SplashScreen.png" />
-      </uap:VisualElements>
-    </Application>
-  </Applications>
+  <Dependencies>
+  <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.0.0" MaxVersionTested="10.0.0.0"/>
+  </Dependencies>
   <Capabilities>
     <rescap:Capability Name="inputInjectionBrokered" />
   </Capabilities>
+  <Applications>
+    <Application Id="App" Executable="under_control_ler.exe" EntryPoint="CoreApp.App">
+      <uap:VisualElements DisplayName="Under Controller" Description="A small utility to share controller inputs peer-to-peer"
+        Square150x150Logo="Square150x150Logo.png" Square44x44Logo="Square44x44Logo.png" BackgroundColor="transparent">
+      </uap:VisualElements>
+    </Application>
+  </Applications>
 </Package>
