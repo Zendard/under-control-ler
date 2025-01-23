@@ -11,10 +11,8 @@ use windows::{
 
 pub struct VirtualGamepad {
     injector: InputInjector,
-    left_x: f64,
-    left_y: f64,
-    right_x: f64,
-    right_y: f64,
+    injected_input: InjectedInputGamepadInfo,
+    current_buttons: GamepadButtons,
 }
 unsafe impl Send for VirtualGamepad {}
 
@@ -24,10 +22,8 @@ impl VirtualGamepad {
         injector.InitializeGamepadInjection()?;
         Ok(Self {
             injector,
-            left_x: 0 as f64,
-            left_y: 0 as f64,
-            right_x: 0 as f64,
-            right_y: 0 as f64,
+            injected_input: InjectedInputGamepadInfo::new()?,
+            current_buttons: GamepadButtons::None,
         })
     }
 
@@ -36,16 +32,15 @@ impl VirtualGamepad {
             GamepadInput::Axis(axis, value) => self.change_axis(axis, value),
             GamepadInput::Button(button, pressed) => self.change_button(button, pressed),
         }
+        self.injected_input
+            .SetButtons(self.current_buttons)
+            .unwrap();
+
+        self.injector
+            .InjectGamepadInput(&self.injected_input)
+            .unwrap();
     }
     fn change_button(&mut self, button: ButtonInput, pressed: bool) {
-        if !pressed {
-            let button = GamepadButtons::None;
-            let injected_input = InjectedInputGamepadInfo::new().unwrap();
-            injected_input.SetButtons(button).ok();
-            self.injector.InjectGamepadInput(&injected_input).unwrap();
-            return;
-        }
-
         let button = match button {
             ButtonInput::A => GamepadButtons::A,
             ButtonInput::B => GamepadButtons::B,
@@ -62,30 +57,24 @@ impl VirtualGamepad {
             ButtonInput::Select => GamepadButtons::View,
             ButtonInput::Start => GamepadButtons::Menu,
         };
-        let injected_input = InjectedInputGamepadInfo::new().unwrap();
-        injected_input.SetButtons(button).ok();
-        self.injector.InjectGamepadInput(&injected_input).unwrap();
+
+        if pressed {
+            self.current_buttons |= button;
+        } else {
+            self.current_buttons.0 ^= button.0;
+        }
     }
     fn change_axis(&mut self, axis: AxisInput, value: i8) {
-        let injected_input = InjectedInputGamepadInfo::new().unwrap();
-
         let value: f64 = value as f64 / 127 as f64;
 
         match axis {
-            AxisInput::StickLeftX => self.left_x = value,
-            AxisInput::StickLeftY => self.left_y = value,
-            AxisInput::StickRightX => self.right_x = value,
-            AxisInput::StickRightY => self.right_y = value,
-            AxisInput::TriggerLeft => injected_input.SetLeftTrigger(value).unwrap(),
-            AxisInput::TriggerRight => injected_input.SetRightTrigger(value).unwrap(),
-        };
-
-        injected_input.SetLeftThumbstickX(self.left_x).unwrap();
-        injected_input.SetLeftThumbstickY(self.left_y).unwrap();
-
-        injected_input.SetRightThumbstickX(self.right_x).unwrap();
-        injected_input.SetRightThumbstickY(self.right_y).unwrap();
-
-        self.injector.InjectGamepadInput(&injected_input).unwrap();
+            AxisInput::StickLeftX => self.injected_input.SetLeftThumbstickX(value),
+            AxisInput::StickLeftY => self.injected_input.SetLeftThumbstickY(value),
+            AxisInput::StickRightX => self.injected_input.SetRightThumbstickX(value),
+            AxisInput::StickRightY => self.injected_input.SetRightThumbstickY(value),
+            AxisInput::TriggerLeft => self.injected_input.SetLeftTrigger(value),
+            AxisInput::TriggerRight => self.injected_input.SetRightTrigger(value),
+        }
+        .unwrap();
     }
 }
