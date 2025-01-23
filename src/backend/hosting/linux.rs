@@ -83,7 +83,7 @@ impl VirtualGamepad {
     }
 
     fn change_button(&mut self, button: ButtonInput, pressed: bool) {
-        // Value has to be numerical so true is 1, false is 2
+        // Value has to be numerical so true is 1, false is 0
         let value = match pressed {
             true => 1,
             false => 0,
