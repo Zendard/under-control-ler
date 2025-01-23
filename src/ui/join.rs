@@ -34,7 +34,7 @@ impl ScreenTrait for JoinScreen {
     fn update(&mut self, message: &UIMessage) {
         if let UIMessage::Client(message) = message {
             let log_text = match message {
-                UIMessageClient::Ping(delay) => format!("Ping: {delay}"),
+                UIMessageClient::Ping(delay) => format!("Ping: {delay}ms"),
                 UIMessageClient::Accepted => "You were accepted by the host".to_string(),
             };
             self.log_text.push(log_text);
