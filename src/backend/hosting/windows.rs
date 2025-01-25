@@ -1,9 +1,6 @@
 use vigem_client::{Client, TargetId, XButtons, XGamepad, Xbox360Wired};
 
-use crate::{
-    backend::{JOYSTICK_RANGE, TRIGGER_RANGE},
-    AxisInput, ButtonInput, GamepadInput,
-};
+use crate::{AxisInput, ButtonInput, GamepadInput};
 use std::error::Error;
 
 pub struct VirtualGamepad {
@@ -25,7 +22,7 @@ impl VirtualGamepad {
 
     pub fn play_input(&mut self, input: GamepadInput) {
         match input {
-            GamepadInput::Axis(axis, value) => return,
+            GamepadInput::Axis(axis, value) => self.change_axis(axis, value),
             GamepadInput::Button(button, pressed) => self.change_button(button, pressed),
         };
 
@@ -55,5 +52,16 @@ impl VirtualGamepad {
             self.current_state.buttons.raw &= !button;
         }
     }
-    fn change_axis(&mut self, axis: AxisInput, value: i8) {}
+    fn change_axis(&mut self, axis: AxisInput, value: i8) {
+        let value_stick = (value as i16) * 256;
+        let value_trigger = (value as u8) << 1;
+        match axis {
+            AxisInput::StickLeftX => self.current_state.thumb_lx = value_stick,
+            AxisInput::StickLeftY => self.current_state.thumb_ly = value_stick,
+            AxisInput::StickRightX => self.current_state.thumb_rx = value_stick,
+            AxisInput::StickRightY => self.current_state.thumb_ry = value_stick,
+            AxisInput::TriggerLeft => self.current_state.left_trigger = value_trigger,
+            AxisInput::TriggerRight => self.current_state.right_trigger = value_trigger,
+        };
+    }
 }
