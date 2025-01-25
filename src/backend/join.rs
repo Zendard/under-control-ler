@@ -64,8 +64,10 @@ pub fn join(
                 continue;
             }
 
+            dbg!(&event);
             // Only send input when we can convert it to a GamepadInput
             if let Some(event) = GamepadInput::from_event(event) {
+                dbg!(&event);
                 network_sender
                     .send_network_message(NetworkMessage::Input(event))
                     .unwrap();
@@ -115,9 +117,8 @@ fn ping(socket: NetworkMessageSender, socket_addr: SocketAddr, mut sender: Sende
 impl GamepadInput {
     fn from_event(event: gilrs::EventType) -> Option<Self> {
         match event {
-            gilrs::EventType::ButtonChanged(button, value, _) => {
-                Self::convert_button(button, value)
-            }
+            gilrs::EventType::ButtonPressed(button, _) => Self::convert_button(button, 1.0),
+            gilrs::EventType::ButtonReleased(button, _) => Self::convert_button(button, 0.0),
             gilrs::EventType::AxisChanged(axis, value, _) => Self::convert_axis(axis, value),
             _ => None,
         }
