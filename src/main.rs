@@ -1,6 +1,6 @@
-use std::net::{IpAddr, SocketAddr};
-
+#![windows_subsystem = "windows"]
 use iced::futures::channel::mpsc;
+use std::net::{IpAddr, SocketAddr};
 mod backend;
 mod ui;
 
