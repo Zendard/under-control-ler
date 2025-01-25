@@ -1,6 +1,6 @@
 [package]
 name = "under-control-ler"
-version = "0.1.0"
+version = "1.1.0"
 edition = "2021"
 
 [dependencies]
@@ -8,4 +8,4 @@ evdev = "0.12.2"
 gilrs = "0.10.9"
 iced = "0.13.1"
 threadpool = "1.8.1"
-windows = {version="0.59.0", features=["UI_Input_Preview_Injection","Gaming_Input"]}
+windows = {version="0.59.0", features=["Win32_UI_Input_KeyboardAndMouse"]}
