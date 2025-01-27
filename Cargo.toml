@@ -8,8 +8,8 @@ gilrs = "0.10.9"
 iced = "0.13.1"
 threadpool = "1.8.1"
 
-[target.'cfg(linux)'.dependencies]
+[target.'cfg(target_os= "linux")'.dependencies]
 evdev = "0.12.2"
 
-[target.'cfg(windows)'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 vigem-client = "0.1.4"
