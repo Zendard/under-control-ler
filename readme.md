@@ -1,5 +1,5 @@
 # Under Control(ler)
-Share gamepad inputs with self-hosting
+A small, self-hosted utility to share gamepad inputs
 # Compatibility
 ## Hosting
 - Hosting on linux should just work (try running as root if it doesn't)
