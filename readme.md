@@ -1,5 +1,5 @@
 # Under Control(ler)
-Share gamepad inputs peer-to-peer
+Share gamepad inputs with self-hosting
 # Compatibility
 ## Hosting
 - Hosting on linux should just work (try running as root if it doesn't)
